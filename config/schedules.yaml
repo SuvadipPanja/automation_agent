@@ -1,0 +1,5 @@
+schedules:
+  - task: TEST_TASK
+    time: "11:15"
+    type: daily
+    enabled: true

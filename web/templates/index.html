@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>ARES – Autonomous Runtime AI Agent</title>
+    <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+<div class="container">
+    <h1 class="title">ARES</h1>
+    <p class="subtitle">Autonomous Runtime AI Agent</p>
+    <p class="status" id="status">IDLE</p>
+
+    <div class="command-box">
+        <input
+            type="text"
+            id="commandInput"
+            placeholder="Speak or type a command..."
+        />
+        <button onclick="sendCommand()">▶</button>
+    </div>
+
+    <pre id="responseBox" class="response">
+ARES online. Awaiting command.
+    </pre>
+
+    <div class="footer">
+        <button onclick="checkHealth()">Health</button>
+        <button onclick="loadTasks()">Tasks</button>
+        <button onclick="loadSchedules()">Schedules</button>
+        <button onclick="reloadSchedules()">Reload</button>
+    </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

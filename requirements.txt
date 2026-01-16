@@ -1,0 +1,12 @@
+schedule
+pyyaml
+pyttsx3
+selenium
+webdriver-manager
+imapclient
+flask
+openai
+requests
+pyyaml
+
+

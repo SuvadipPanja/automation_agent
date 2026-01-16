@@ -1,0 +1,145 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    height: 100vh;
+    background: radial-gradient(circle at center, #081218, #000);
+    font-family: "Segoe UI", system-ui;
+    color: #e6f7ff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* MAIN HUD */
+.hud {
+    width: 700px;
+    text-align: center;
+}
+
+/* AI CORE */
+.ai-core {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    margin: auto;
+}
+
+.core-ring {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    border: 1px solid rgba(120,200,255,0.25);
+    box-shadow: 0 0 25px rgba(120,200,255,0.3);
+    animation: spin 20s linear infinite;
+}
+
+.core-dot {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 14px;
+    height: 14px;
+    background: #8fdcff;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 18px #8fdcff;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* TITLES */
+h1 {
+    margin-top: 20px;
+    font-weight: 300;
+    letter-spacing: 6px;
+}
+
+.tagline {
+    font-size: 12px;
+    opacity: 0.6;
+    margin-bottom: 15px;
+}
+
+/* STATUS */
+.status {
+    font-size: 11px;
+    letter-spacing: 2px;
+    margin-bottom: 25px;
+    opacity: 0.8;
+}
+
+.status.idle { color: #9aa; }
+.status.thinking { color: #ffd27d; }
+.status.online { color: #8fffba; }
+
+/* COMMAND BAR */
+.command-bar {
+    display: flex;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(120,200,255,0.2);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.command-bar input {
+    flex: 1;
+    padding: 14px;
+    background: transparent;
+    border: none;
+    color: #e6f7ff;
+    outline: none;
+    font-size: 14px;
+}
+
+.command-bar button {
+    width: 50px;
+    border: none;
+    background: rgba(120,200,255,0.15);
+    color: #8fdcff;
+    cursor: pointer;
+}
+
+/* RESPONSE */
+.response {
+    margin-top: 20px;
+    padding: 15px;
+    background: rgba(0,0,0,0.6);
+    border-left: 2px solid #8fdcff;
+    text-align: left;
+    font-size: 13px;
+    max-height: 160px;
+    overflow-y: auto;
+}
+
+/* CONTROLS */
+.controls {
+    margin-top: 25px;
+    display: flex;
+    justify-content: space-around;
+    font-size: 11px;
+    opacity: 0.6;
+}
+
+.controls span {
+    cursor: pointer;
+}
+
+.controls span:hover {
+    color: #8fdcff;
+}
+
+.mic-btn {
+    background: radial-gradient(circle, #00eaff, #006d75);
+    border: none;
+    color: black;
+    font-weight: bold;
+    padding: 10px 14px;
+    border-radius: 50%;
+    cursor: pointer;
+}
