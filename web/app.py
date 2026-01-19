@@ -1,10 +1,17 @@
 """
 =====================================================
-ARES WEB APPLICATION - INTEGRATED & FIXED
+ARES WEB APPLICATION - INTEGRATED
 =====================================================
 Main Flask application for ARES.
 
-FIXED: Timer functionality now working properly!
+Features:
+? Web UI (JARVIS-style interface)
+? AI Brain (Ollama/Llama3)
+? Desktop Automation
+? Whisper Voice Recognition
+? Text-to-Speech (via browser)
+
+All accessible from ONE entry point: main_web.py
 
 Author: ARES AI Assistant
 For: Shobutik Panja
@@ -18,7 +25,6 @@ import traceback
 import base64
 import tempfile
 import os
-import sys
 
 # ===========================================
 # APP SETUP
@@ -45,16 +51,15 @@ except Exception as e:
     brain = None
     print(f"? AI Brain not available: {e}")
 
-# Desktop Controller - FIXED IMPORT
+# Desktop Controller
 try:
-    from automation import execute_command as desktop_execute
-    from automation.desktop_control import desktop
+    from desktop import handle_command as desktop_handle
+    from desktop import desktop
     DESKTOP_OK = True
     print("? Desktop automation loaded")
 except Exception as e:
     DESKTOP_OK = False
     desktop = None
-    desktop_execute = None
     print(f"? Desktop automation not available: {e}")
 
 # Whisper Voice Recognition
@@ -68,52 +73,35 @@ except Exception as e:
     WHISPER_OK = False
     print(f"? Whisper not available: {e}")
 
-# Reminder System - FIXED INITIALIZATION
-reminder_manager = None
-REMINDERS_OK = False
-
+# Reminder System
 try:
     from automation.reminders import get_reminder_manager
     reminder_manager = get_reminder_manager()
-    
-    # CRITICAL FIX: Ensure the background thread is running
-    if not reminder_manager._running:
-        print("? Reminder thread not running, starting now...")
-        reminder_manager.start()
-    
     REMINDERS_OK = True
-    print(f"? Reminders loaded - {len(reminder_manager.get_all())} active")
-    print(f"  Background thread running: {reminder_manager._running}")
-    
 except Exception as e:
     reminder_manager = None
     REMINDERS_OK = False
     print(f"? Reminders not available: {e}")
-    traceback.print_exc()
 
+# Task System
+try:
+    from automation.tasks import get_task_manager
+    task_manager = get_task_manager()
+    TASKS_OK = True
+except Exception as e:
+    task_manager = None
+    TASKS_OK = False
+    print(f"? Tasks not available: {e}")
 
-# ===========================================
-# STARTUP BANNER FUNCTION
-# ===========================================
-
-def print_startup():
-    """Print startup banner with component status"""
-    print("\n" + "=" * 60)
-    print("   ?? ARES - Autonomous Runtime AI Agent")
-    print("=" * 60)
-    print(f"   AI Brain:    {'?' if brain else '?'}")
-    print(f"   Desktop:     {'?' if DESKTOP_OK else '?'}")
-    print(f"   Whisper:     {'?' if WHISPER_OK else '?'}")
-    print(f"   Reminders:   {'?' if REMINDERS_OK else '?'}")
-    if REMINDERS_OK and reminder_manager:
-        print(f"   - Active reminders: {len(reminder_manager.get_all())}")
-        print(f"   - Background check: {'? Running' if reminder_manager._running else '? Stopped'}")
-    print("=" * 60)
-    print("   Modern UI: http://127.0.0.1:5000/")
-    print("   Classic UI: http://127.0.0.1:5000/classic")
-    print("   Memory: http://127.0.0.1:5000/memory")
-    print("   Voice Test: http://127.0.0.1:5000/voice/test")
-    print("=" * 60 + "\n")
+# Scheduler System
+try:
+    from automation.scheduler import get_scheduler
+    scheduler = get_scheduler()
+    SCHEDULER_OK = True
+except Exception as e:
+    scheduler = None
+    SCHEDULER_OK = False
+    print(f"? Scheduler not available: {e}")
 
 
 # ===========================================
@@ -122,20 +110,8 @@ def print_startup():
 
 @app.route("/")
 def index():
-    """Main ARES UI - Modern JARVIS-style"""
-    return render_template("index_modern.html")
-
-
-@app.route("/classic")
-def classic():
-    """Classic ARES UI"""
+    """Main ARES UI."""
     return render_template("index.html")
-
-
-@app.route("/memory")
-def memory_page():
-    """Memory/Profile management page"""
-    return render_template("memory.html")
 
 
 @app.route("/health")
@@ -149,42 +125,18 @@ def health():
             "ai_brain": brain is not None,
             "desktop": DESKTOP_OK,
             "whisper": WHISPER_OK,
-            "reminders": REMINDERS_OK
+            "reminders": REMINDERS_OK,
+            "tasks": TASKS_OK,
+            "scheduler": SCHEDULER_OK
         }
     })
 
 
-@app.route("/status")
-def status():
-    """Enhanced status endpoint"""
-    reminder_status = {}
-    if REMINDERS_OK and reminder_manager:
-        reminder_status = {
-            "enabled": True,
-            "active_count": len(reminder_manager.get_all()),
-            "thread_running": reminder_manager._running
-        }
-    else:
-        reminder_status = {"enabled": False}
-    
-    return jsonify({
-        "agent": "ARES",
-        "status": "ONLINE",
-        "version": "2.0",
-        "time": datetime.datetime.now().isoformat(),
-        "features": {
-            "ai_brain": brain is not None,
-            "desktop_automation": DESKTOP_OK,
-            "whisper_available": WHISPER_OK,
-            "reminders": reminder_status
-        }
-    })
-
-
-@app.route("/tasks")
-def tasks():
-    """Available tasks."""
+@app.route("/system-tasks")
+def system_tasks():
+    """Available system task types."""
     return jsonify([
+        {"name": "TEST_TASK"},
         {"name": "DESKTOP_CONTROL"},
         {"name": "VOICE_COMMAND"},
         {"name": "AI_CONVERSATION"},
@@ -205,30 +157,20 @@ def reload_schedules():
 
 
 # ===========================================
-# REMINDER API ROUTES - FIXED
+# REMINDER API ROUTES
 # ===========================================
 
 @app.route("/reminders")
 def get_reminders():
     """Get all active reminders."""
     if not REMINDERS_OK or not reminder_manager:
-        return jsonify({
-            "error": "Reminder system not available",
-            "reminders": [],
-            "count": 0
-        }), 503
+        return jsonify({"error": "Reminder system not available"}), 503
     
-    try:
-        reminders = reminder_manager.get_all()
-        print(f"?? GET /reminders - Found {len(reminders)} active reminders")
-        return jsonify({
-            "reminders": [r.to_dict() for r in reminders],
-            "count": len(reminders)
-        })
-    except Exception as e:
-        print(f"? Error getting reminders: {e}")
-        traceback.print_exc()
-        return jsonify({"error": str(e), "reminders": [], "count": 0}), 500
+    reminders = reminder_manager.get_all()
+    return jsonify({
+        "reminders": [r.to_dict() for r in reminders],
+        "count": len(reminders)
+    })
 
 
 @app.route("/reminders/triggered")
@@ -237,16 +179,10 @@ def get_triggered_reminders():
     if not REMINDERS_OK or not reminder_manager:
         return jsonify({"triggered": []})
     
-    try:
-        triggered = reminder_manager.get_triggered()
-        if triggered:
-            print(f"?? GET /reminders/triggered - {len(triggered)} triggered reminders")
-        return jsonify({
-            "triggered": [r.to_dict() for r in triggered]
-        })
-    except Exception as e:
-        print(f"? Error getting triggered reminders: {e}")
-        return jsonify({"triggered": []})
+    triggered = reminder_manager.get_triggered()
+    return jsonify({
+        "triggered": [r.to_dict() for r in triggered]
+    })
 
 
 @app.route("/reminders/add", methods=["POST"])
@@ -271,14 +207,11 @@ def add_reminder():
             hours=hours,
             seconds=seconds
         )
-        print(f"? Added reminder: {message} in {reminder.time_until()}")
         return jsonify({
             "success": True,
             "reminder": reminder.to_dict()
         })
     except Exception as e:
-        print(f"? Error adding reminder: {e}")
-        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 
@@ -288,14 +221,9 @@ def delete_reminder(reminder_id):
     if not REMINDERS_OK or not reminder_manager:
         return jsonify({"error": "Reminder system not available"}), 503
     
-    try:
-        if reminder_manager.delete(reminder_id):
-            print(f"??? Deleted reminder: {reminder_id}")
-            return jsonify({"success": True})
-        return jsonify({"error": "Reminder not found"}), 404
-    except Exception as e:
-        print(f"? Error deleting reminder: {e}")
-        return jsonify({"error": str(e)}), 500
+    if reminder_manager.delete(reminder_id):
+        return jsonify({"success": True})
+    return jsonify({"error": "Reminder not found"}), 404
 
 
 @app.route("/reminders/clear", methods=["POST"])
@@ -304,64 +232,180 @@ def clear_reminders():
     if not REMINDERS_OK or not reminder_manager:
         return jsonify({"error": "Reminder system not available"}), 503
     
+    count = reminder_manager.clear_all()
+    return jsonify({"success": True, "deleted": count})
+
+
+# ===========================================
+# TASK API ROUTES
+# ===========================================
+
+@app.route("/tasks")
+def get_tasks():
+    """Get all available tasks."""
+    if not TASKS_OK or not task_manager:
+        return jsonify({"error": "Task system not available"}), 503
+    
+    tasks = task_manager.get_all()
+    return jsonify({
+        "tasks": [t.to_dict() for t in tasks],
+        "count": len(tasks)
+    })
+
+
+@app.route("/tasks/run/<task_id>", methods=["POST"])
+def run_task(task_id):
+    """Run a task by ID."""
+    if not TASKS_OK or not task_manager:
+        return jsonify({"error": "Task system not available"}), 503
+    
+    result = task_manager.run_task(task_id)
+    
+    if result:
+        return jsonify({
+            "success": result.status == "completed",
+            "task_id": result.task_id,
+            "task_name": result.task_name,
+            "status": result.status,
+            "message": result.message,
+            "speak": result.speak_text
+        })
+    
+    return jsonify({"error": "Task not found"}), 404
+
+
+@app.route("/tasks/run-by-name", methods=["POST"])
+def run_task_by_name():
+    """Run a task by name."""
+    if not TASKS_OK or not task_manager:
+        return jsonify({"error": "Task system not available"}), 503
+    
+    data = request.get_json(silent=True)
+    if not data or "name" not in data:
+        return jsonify({"error": "No task name provided"}), 400
+    
+    result = task_manager.run_task_by_name(data["name"])
+    
+    if result:
+        return jsonify({
+            "success": result.status == "completed",
+            "task_id": result.task_id,
+            "task_name": result.task_name,
+            "status": result.status,
+            "message": result.message,
+            "speak": result.speak_text
+        })
+    
+    return jsonify({"error": "Task not found"}), 404
+
+
+# ===========================================
+# SCHEDULE API ROUTES
+# ===========================================
+
+@app.route("/schedules")
+def get_schedules():
+    """Get all schedules."""
+    if not SCHEDULER_OK or not scheduler:
+        return jsonify({"error": "Scheduler not available"}), 503
+    
+    schedules = scheduler.get_all()
+    return jsonify({
+        "schedules": [s.to_dict() for s in schedules],
+        "count": len(schedules)
+    })
+
+
+@app.route("/schedules/add", methods=["POST"])
+def add_schedule():
+    """Add a new schedule."""
+    if not SCHEDULER_OK or not scheduler:
+        return jsonify({"error": "Scheduler not available"}), 503
+    
+    data = request.get_json(silent=True)
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
+    
+    task_id = data.get("task_id")
+    task_name = data.get("task_name", "Task")
+    schedule_type = data.get("type", "daily")
+    
     try:
-        count = reminder_manager.clear_all()
-        print(f"??? Cleared {count} reminders")
-        return jsonify({"success": True, "deleted": count})
+        if schedule_type == "daily":
+            hour = data.get("hour", 9)
+            minute = data.get("minute", 0)
+            schedule = scheduler.create_daily_schedule(task_id, task_name, hour, minute)
+        elif schedule_type == "interval":
+            minutes = data.get("minutes", 60)
+            schedule = scheduler.create_interval_schedule(task_id, task_name, minutes)
+        elif schedule_type == "weekly":
+            days = data.get("days", [0])
+            hour = data.get("hour", 9)
+            minute = data.get("minute", 0)
+            schedule = scheduler.create_weekly_schedule(task_id, task_name, days, hour, minute)
+        else:
+            return jsonify({"error": "Invalid schedule type"}), 400
+        
+        return jsonify({
+            "success": True,
+            "schedule": schedule.to_dict()
+        })
     except Exception as e:
-        print(f"? Error clearing reminders: {e}")
         return jsonify({"error": str(e)}), 500
 
 
-# ===========================================
-# DEBUG ROUTE - TIMER STATUS
-# ===========================================
-
-@app.route("/reminders/debug")
-def reminders_debug():
-    """Debug endpoint to check reminder system status"""
-    if not REMINDERS_OK or not reminder_manager:
-        return jsonify({
-            "status": "NOT AVAILABLE",
-            "error": "Reminder system not loaded"
-        })
+@app.route("/schedules/delete/<schedule_id>", methods=["DELETE"])
+def delete_schedule(schedule_id):
+    """Delete a schedule."""
+    if not SCHEDULER_OK or not scheduler:
+        return jsonify({"error": "Scheduler not available"}), 503
     
-    try:
-        all_reminders = reminder_manager.get_all()
-        return jsonify({
-            "status": "OK",
-            "thread_running": reminder_manager._running,
-            "active_reminders": len(all_reminders),
-            "reminders": [
-                {
-                    "id": r.id,
-                    "message": r.message,
-                    "type": r.reminder_type,
-                    "trigger_time": r.trigger_time.isoformat(),
-                    "time_until": r.time_until(),
-                    "is_due": r.is_due(),
-                    "status": r.status
-                }
-                for r in all_reminders
-            ]
-        })
-    except Exception as e:
-        return jsonify({
-            "status": "ERROR",
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        })
+    if scheduler.delete(schedule_id):
+        return jsonify({"success": True})
+    return jsonify({"error": "Schedule not found"}), 404
+
+
+@app.route("/schedules/enable/<schedule_id>", methods=["POST"])
+def enable_schedule(schedule_id):
+    """Enable a schedule."""
+    if not SCHEDULER_OK or not scheduler:
+        return jsonify({"error": "Scheduler not available"}), 503
+    
+    if scheduler.enable(schedule_id, True):
+        return jsonify({"success": True})
+    return jsonify({"error": "Schedule not found"}), 404
+
+
+@app.route("/schedules/disable/<schedule_id>", methods=["POST"])
+def disable_schedule(schedule_id):
+    """Disable a schedule."""
+    if not SCHEDULER_OK or not scheduler:
+        return jsonify({"error": "Scheduler not available"}), 503
+    
+    if scheduler.enable(schedule_id, False):
+        return jsonify({"success": True})
+    return jsonify({"error": "Schedule not found"}), 404
+
+
+@app.route("/schedules/clear", methods=["POST"])
+def clear_schedules():
+    """Clear all schedules."""
+    if not SCHEDULER_OK or not scheduler:
+        return jsonify({"error": "Scheduler not available"}), 503
+    
+    count = scheduler.clear_all()
+    return jsonify({"success": True, "deleted": count})
 
 
 # ===========================================
-# MAIN AI COMMAND ENDPOINT - ENHANCED
+# MAIN AI COMMAND ENDPOINT
 # ===========================================
 
 @app.route("/ai-command", methods=["POST"])
 def ai_command():
     """
     Main command endpoint.
-    Handles all commands - desktop, conversation, reminders, etc.
+    Handles all commands - desktop, conversation, etc.
     """
     try:
         data = request.get_json(silent=True)
@@ -376,51 +420,25 @@ def ai_command():
         
         text = user_input.lower()
         
-        print(f"\n?? Command received: '{user_input}'")
-        
-        # ===========================================
-        # SPECIAL: TIMER DEBUG COMMAND
-        # ===========================================
-        if text in ["timer status", "reminder status", "check timers"]:
-            if REMINDERS_OK and reminder_manager:
-                response = reminder_manager.format_list()
-                print(f"?? Timer status: {response}")
-                return jsonify({
-                    "reply": response,
-                    "response": response,
-                    "speech": response,
-                    "source": "reminder_status"
-                })
-        
         # ===========================================
         # TRY DESKTOP AUTOMATION FIRST
         # ===========================================
-        if DESKTOP_OK and desktop_execute:
-            try:
-                print(f"??? Trying desktop automation...")
-                success, response = desktop_execute(user_input)
-                
-                # If desktop handled it successfully
-                if success:
-                    print(f"? Desktop handled: {response[:100]}")
-                    return jsonify({
-                        "reply": response,
-                        "response": response,
-                        "speech": response,
-                        "action": "desktop",
-                        "success": True,
-                        "source": "desktop"
-                    })
-                else:
-                    print(f"?? Desktop could not handle: {response}")
-            except Exception as e:
-                print(f"? Desktop execution error: {e}")
-                traceback.print_exc()
+        if DESKTOP_OK:
+            result = desktop_handle(user_input)
+            
+            # If desktop handled it successfully
+            if result.get("success") or result.get("action") not in ["unknown", "conversation", None]:
+                return jsonify({
+                    "reply": result.get("response", "Done."),
+                    "action": result.get("action"),
+                    "data": result.get("data"),
+                    "source": "desktop"
+                })
         
         # ===========================================
         # FAST GREETINGS (No AI needed)
         # ===========================================
-        if text in ["hi", "hello", "hey", "hii", "hello there"]:
+        if text in ["hi", "hello", "hey", "hii"]:
             hour = datetime.datetime.now().hour
             if hour < 12:
                 greet = "Good morning"
@@ -429,12 +447,9 @@ def ai_command():
             else:
                 greet = "Good evening"
             
-            reply = f"{greet}! I'm ARES. How can I help you?"
-            print(f"?? Fast greeting: {reply}")
+            reply = f"{greet}, Shobutik! I'm ARES. How can I help you?"
             return jsonify({
                 "reply": reply,
-                "response": reply,
-                "speech": reply,
                 "source": "fast"
             })
         
@@ -443,35 +458,85 @@ def ai_command():
         # ===========================================
         if brain:
             try:
-                print(f"?? Using AI Brain...")
                 response = brain.converse(user_input)
                 if response:
-                    print(f"? AI response: {response[:100]}")
                     return jsonify({
                         "reply": response,
-                        "response": response,
-                        "speech": response,
                         "source": "ai"
                     })
             except Exception as e:
-                print(f"? AI Brain error: {e}")
-                traceback.print_exc()
+                print(f"AI Brain error: {e}")
         
         # ===========================================
         # FALLBACK
         # ===========================================
-        fallback = f"I heard: '{user_input}'. Try asking 'help' to see what I can do."
-        print(f"?? Fallback response")
         return jsonify({
-            "reply": fallback,
-            "response": f"Command received: {user_input}",
-            "speech": "I'm not sure how to help with that.",
+            "reply": f"I heard: '{user_input}'. Try asking for 'help' to see what I can do.",
             "source": "fallback"
         })
     
     except Exception as e:
         print(f"? Error in /ai-command: {e}")
         traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+# ===========================================
+# DESKTOP AUTOMATION ROUTES
+# ===========================================
+
+@app.route("/desktop/status")
+def desktop_status():
+    """Desktop automation status."""
+    if DESKTOP_OK and desktop:
+        return jsonify(desktop.get_status())
+    return jsonify({"available": False})
+
+
+@app.route("/desktop/action", methods=["POST"])
+def desktop_action():
+    """Execute a specific desktop action."""
+    if not DESKTOP_OK:
+        return jsonify({"error": "Desktop automation not available"}), 503
+    
+    try:
+        data = request.get_json()
+        action = data.get("action")
+        params = data.get("params", {})
+        
+        # Map actions to methods
+        actions = {
+            "open_app": lambda: desktop.open_app(params.get("app", "")),
+            "close_app": lambda: desktop.close_app(params.get("app", "")),
+            "open_folder": lambda: desktop.open_folder(params.get("folder", "")),
+            "search_google": lambda: desktop.search_google(params.get("query", "")),
+            "search_youtube": lambda: desktop.search_youtube(params.get("query", "")),
+            "open_website": lambda: desktop.open_website(params.get("url", "")),
+            "screenshot": lambda: desktop.take_screenshot(),
+            "volume_up": lambda: desktop.volume_up(),
+            "volume_down": lambda: desktop.volume_down(),
+            "mute": lambda: desktop.mute(),
+            "play_pause": lambda: desktop.play_pause(),
+            "next_track": lambda: desktop.next_track(),
+            "previous_track": lambda: desktop.previous_track(),
+            "minimize_all": lambda: desktop.minimize_all(),
+            "lock": lambda: desktop.lock_computer(),
+            "time": lambda: (True, f"The time is {desktop.get_time()}"),
+            "date": lambda: (True, f"Today is {desktop.get_date()}"),
+            "battery": lambda: (True, desktop.get_battery()),
+        }
+        
+        if action not in actions:
+            return jsonify({"error": f"Unknown action: {action}"}), 400
+        
+        success, response = actions[action]()
+        return jsonify({
+            "success": success,
+            "response": response,
+            "action": action
+        })
+    
+    except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
@@ -557,85 +622,23 @@ def voice_transcribe():
 
 
 # ===========================================
-# MEMORY ROUTES
+# SYSTEM INFO ROUTES
 # ===========================================
 
-@app.route("/memory/profile")
-def memory_profile():
-    """Get user profile and memory info"""
-    if not brain:
-        return jsonify({"error": "AI Brain not available"}), 503
-    
-    try:
-        profile_data = brain.profile.get_full_profile()
-        memory_export = brain.memory.export_memory()
-        
-        return jsonify({
-            "profile": profile_data.get("user", {}),
-            "preferences": memory_export.get("preferences", {}),
-            "facts": memory_export.get("facts", [])
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+@app.route("/system/info")
+def system_info():
+    """Get system information."""
+    if DESKTOP_OK and desktop:
+        return jsonify(desktop.get_system_info())
+    return jsonify({"error": "Desktop not available"}), 503
 
 
-@app.route("/memory/conversations")
-def memory_conversations():
-    """Get conversation history"""
-    if not brain:
-        return jsonify({"error": "AI Brain not available"}), 503
-    
-    try:
-        limit = int(request.args.get("limit", 10))
-        conversations = brain.memory.get_recent_conversations(limit)
-        return jsonify({"conversations": conversations})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/memory/clear-conversations", methods=["POST"])
-def memory_clear_conversations():
-    """Clear conversation history"""
-    if not brain:
-        return jsonify({"error": "AI Brain not available"}), 503
-    
-    try:
-        brain.memory.clear_conversations()
-        return jsonify({"success": True})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/memory/clear-all", methods=["POST"])
-def memory_clear_all():
-    """Clear ALL memory"""
-    if not brain:
-        return jsonify({"error": "AI Brain not available"}), 503
-    
-    try:
-        brain.memory.clear_all_memory()
-        return jsonify({"success": True})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@app.route("/memory/export")
-def memory_export():
-    """Export all memory"""
-    if not brain:
-        return jsonify({"error": "AI Brain not available"}), 503
-    
-    try:
-        memory_data = brain.memory.export_memory()
-        profile_data = brain.profile.get_full_profile()
-        
-        return jsonify({
-            "memory": memory_data,
-            "profile": profile_data,
-            "exported_at": datetime.datetime.now().isoformat()
-        })
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+@app.route("/system/apps")
+def running_apps():
+    """Get running applications."""
+    if DESKTOP_OK and desktop:
+        return jsonify({"apps": desktop.list_running_apps()})
+    return jsonify({"error": "Desktop not available"}), 503
 
 
 # ===========================================
@@ -653,5 +656,14 @@ def serve_static(filename):
 # ===========================================
 
 if __name__ == "__main__":
-    print_startup()
+    print("\n" + "=" * 50)
+    print("   ARES - Autonomous Runtime AI Agent")
+    print("=" * 50)
+    print(f"   AI Brain:    {'?' if brain else '?'}")
+    print(f"   Desktop:     {'?' if DESKTOP_OK else '?'}")
+    print(f"   Whisper:     {'?' if WHISPER_OK else '?'}")
+    print("=" * 50)
+    print("   Open: http://127.0.0.1:5000")
+    print("=" * 50 + "\n")
+    
     app.run(host="127.0.0.1", port=5000, debug=True)

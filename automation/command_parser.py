@@ -93,6 +93,15 @@ class CommandType(Enum):
     DELETE_ALL_REMINDERS = "delete_all_reminders"
     SNOOZE = "snooze"
     
+    # Tasks & Scheduling
+    RUN_TASK = "run_task"
+    LIST_TASKS = "list_tasks"
+    CREATE_SCHEDULE = "create_schedule"
+    LIST_SCHEDULES = "list_schedules"
+    DELETE_SCHEDULE = "delete_schedule"
+    ENABLE_SCHEDULE = "enable_schedule"
+    DISABLE_SCHEDULE = "disable_schedule"
+    
     # Conversation
     GREETING = "greeting"
     HELP = "help"
@@ -287,6 +296,41 @@ class CommandParser:
         # Snooze
         (r"snooze(?:\s+(?:for\s+)?(\d+)\s*(?:min(?:ute)?s?)?)?", 
          CommandType.SNOOZE, "snooze_minutes"),
+        
+        # ============ TASKS & SCHEDULING ============
+        # Run task: "run morning routine", "execute backup task", "start work apps"
+        (r"(?:run|execute|start|do|perform)\s+(?:the\s+)?(?:task\s+)?(.+?)(?:\s+task)?$", 
+         CommandType.RUN_TASK, "task_name"),
+        
+        # List tasks
+        (r"(?:show|list|what)\s+(?:are\s+)?(?:my\s+|the\s+|all\s+)?(?:available\s+)?tasks?", 
+         CommandType.LIST_TASKS, None),
+        (r"what\s+tasks\s+(?:can\s+you|do\s+you|are)", 
+         CommandType.LIST_TASKS, None),
+        
+        # Create schedule: "schedule backup daily at 6pm", "schedule morning routine every day at 9am"
+        (r"schedule\s+(.+?)\s+(daily|every\s+day|every\s+\d+\s*(?:hour|minute|min|hr)s?|every\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|weekday)s?)\s*(?:at\s+)?(.+)?", 
+         CommandType.CREATE_SCHEDULE, "schedule_params"),
+        (r"(?:create|add|set)\s+(?:a\s+)?schedule\s+(?:for\s+)?(.+)", 
+         CommandType.CREATE_SCHEDULE, "schedule_params"),
+        
+        # List schedules
+        (r"(?:show|list|what)\s+(?:are\s+)?(?:my\s+|the\s+|all\s+)?schedules?", 
+         CommandType.LIST_SCHEDULES, None),
+        (r"(?:what|show)\s+(?:is|are)\s+scheduled", 
+         CommandType.LIST_SCHEDULES, None),
+        
+        # Delete schedule
+        (r"(?:delete|remove|cancel|clear)\s+(?:all\s+)?schedules?", 
+         CommandType.DELETE_SCHEDULE, None),
+        (r"(?:delete|remove|cancel)\s+schedule\s+(\d+)", 
+         CommandType.DELETE_SCHEDULE, "schedule_index"),
+        
+        # Enable/disable schedule
+        (r"(?:enable|activate|turn\s+on)\s+schedule\s+(\d+)", 
+         CommandType.ENABLE_SCHEDULE, "schedule_index"),
+        (r"(?:disable|deactivate|turn\s+off)\s+schedule\s+(\d+)", 
+         CommandType.DISABLE_SCHEDULE, "schedule_index"),
         
         # ============ GREETINGS ============
         (r"^(?:hi|hello|hey|good\s+(?:morning|afternoon|evening))(?:\s+ares)?$", 
@@ -687,6 +731,36 @@ class CommandExecutor:
             return self._handle_snooze(minutes)
         
         # ===========================================
+        # TASK & SCHEDULE COMMANDS
+        # ===========================================
+        
+        elif ct == CommandType.RUN_TASK:
+            task_name = params.get("task_name", "")
+            return self._handle_run_task(task_name)
+        
+        elif ct == CommandType.LIST_TASKS:
+            return self._handle_list_tasks()
+        
+        elif ct == CommandType.CREATE_SCHEDULE:
+            schedule_params = params.get("schedule_params", "")
+            return self._handle_create_schedule(schedule_params, cmd.original_text)
+        
+        elif ct == CommandType.LIST_SCHEDULES:
+            return self._handle_list_schedules()
+        
+        elif ct == CommandType.DELETE_SCHEDULE:
+            schedule_index = params.get("schedule_index", "")
+            return self._handle_delete_schedule(schedule_index, cmd.original_text)
+        
+        elif ct == CommandType.ENABLE_SCHEDULE:
+            schedule_index = params.get("schedule_index", "")
+            return self._handle_enable_schedule(schedule_index, True)
+        
+        elif ct == CommandType.DISABLE_SCHEDULE:
+            schedule_index = params.get("schedule_index", "")
+            return self._handle_enable_schedule(schedule_index, False)
+        
+        # ===========================================
         # CONVERSATIONAL
         # ===========================================
         
@@ -908,6 +982,194 @@ class CommandExecutor:
         
         return result if result else "Reminder"
     
+    # ===========================================
+    # TASK & SCHEDULE HANDLERS
+    # ===========================================
+    
+    def _handle_run_task(self, task_name: str) -> Tuple[bool, str]:
+        """Handle running a task by name."""
+        try:
+            from automation.tasks import get_task_manager
+            manager = get_task_manager()
+            
+            # Clean task name
+            task_name = task_name.strip().lower()
+            task_name = re.sub(r'\s+task$', '', task_name)
+            
+            # Try to find and run task
+            result = manager.run_task_by_name(task_name)
+            
+            if result:
+                if result.status == "completed":
+                    msg = f"✅ Task '{result.task_name}' completed!"
+                    if result.speak_text:
+                        msg += f"\n{result.speak_text}"
+                    return True, msg
+                elif result.status == "skipped":
+                    return False, f"⚠️ Task '{result.task_name}' is disabled."
+                else:
+                    return False, f"❌ Task failed: {result.message}"
+            else:
+                # List similar tasks
+                tasks = manager.get_all()
+                task_names = [t.name for t in tasks[:5]]
+                return False, f"Task not found: '{task_name}'. Available: {', '.join(task_names)}"
+            
+        except Exception as e:
+            return False, f"Could not run task: {e}"
+    
+    def _handle_list_tasks(self) -> Tuple[bool, str]:
+        """Handle listing available tasks."""
+        try:
+            from automation.tasks import get_task_manager
+            manager = get_task_manager()
+            return True, manager.format_list()
+        except Exception as e:
+            return False, f"Could not list tasks: {e}"
+    
+    def _handle_create_schedule(self, params: str, original: str) -> Tuple[bool, str]:
+        """Handle creating a schedule."""
+        try:
+            from automation.tasks import get_task_manager
+            from automation.scheduler import get_scheduler, ScheduleParser
+            
+            task_manager = get_task_manager()
+            scheduler = get_scheduler()
+            
+            text = original.lower()
+            
+            # Parse schedule time
+            schedule_info = ScheduleParser.parse(text)
+            
+            if not schedule_info:
+                return False, "I couldn't understand the schedule. Try: 'schedule morning routine daily at 9am'"
+            
+            # Find task name in the command
+            # Pattern: "schedule <task_name> <schedule>"
+            task_name = None
+            
+            # Try common patterns
+            patterns = [
+                r'schedule\s+(.+?)\s+(?:daily|every|at\s+\d)',
+                r'schedule\s+(.+?)\s+(?:on\s+)',
+            ]
+            
+            for pattern in patterns:
+                match = re.search(pattern, text)
+                if match:
+                    task_name = match.group(1).strip()
+                    break
+            
+            if not task_name:
+                return False, "Please specify which task to schedule. Try: 'schedule morning routine daily at 9am'"
+            
+            # Find the task
+            task = task_manager.get_by_name(task_name)
+            if not task:
+                return False, f"Task not found: '{task_name}'. Say 'list tasks' to see available tasks."
+            
+            # Create schedule based on type
+            if schedule_info["type"] == "daily":
+                schedule = scheduler.create_daily_schedule(
+                    task_id=task.id,
+                    task_name=task.name,
+                    hour=schedule_info["hour"],
+                    minute=schedule_info.get("minute", 0)
+                )
+                time_str = f"{schedule_info['hour']:02d}:{schedule_info.get('minute', 0):02d}"
+                return True, f"📅 Scheduled '{task.name}' daily at {time_str}"
+            
+            elif schedule_info["type"] == "interval":
+                schedule = scheduler.create_interval_schedule(
+                    task_id=task.id,
+                    task_name=task.name,
+                    minutes=schedule_info["minutes"]
+                )
+                mins = schedule_info["minutes"]
+                if mins >= 60:
+                    time_str = f"{mins // 60} hour{'s' if mins >= 120 else ''}"
+                else:
+                    time_str = f"{mins} minute{'s' if mins > 1 else ''}"
+                return True, f"📅 Scheduled '{task.name}' every {time_str}"
+            
+            elif schedule_info["type"] == "weekly":
+                schedule = scheduler.create_weekly_schedule(
+                    task_id=task.id,
+                    task_name=task.name,
+                    days=schedule_info["days"],
+                    hour=schedule_info["hour"],
+                    minute=schedule_info.get("minute", 0)
+                )
+                day_names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+                days_str = ', '.join([day_names[d] for d in schedule_info["days"]])
+                return True, f"📅 Scheduled '{task.name}' on {days_str}"
+            
+            return False, "Could not create schedule."
+            
+        except Exception as e:
+            return False, f"Could not create schedule: {e}"
+    
+    def _handle_list_schedules(self) -> Tuple[bool, str]:
+        """Handle listing schedules."""
+        try:
+            from automation.scheduler import get_scheduler
+            scheduler = get_scheduler()
+            return True, scheduler.format_list()
+        except Exception as e:
+            return False, f"Could not list schedules: {e}"
+    
+    def _handle_delete_schedule(self, index_str: str, original: str) -> Tuple[bool, str]:
+        """Handle deleting a schedule."""
+        try:
+            from automation.scheduler import get_scheduler
+            scheduler = get_scheduler()
+            
+            # Check if deleting all
+            if 'all' in original.lower():
+                count = scheduler.clear_all()
+                return True, f"🗑️ Deleted {count} schedule(s)."
+            
+            # Delete by index
+            if index_str:
+                try:
+                    index = int(index_str)
+                    if scheduler.delete_by_index(index):
+                        return True, f"🗑️ Deleted schedule {index}."
+                    return False, f"Schedule {index} not found."
+                except ValueError:
+                    pass
+            
+            return False, "Specify which schedule to delete (e.g., 'delete schedule 1')."
+            
+        except Exception as e:
+            return False, f"Could not delete schedule: {e}"
+    
+    def _handle_enable_schedule(self, index_str: str, enable: bool) -> Tuple[bool, str]:
+        """Handle enabling/disabling a schedule."""
+        try:
+            from automation.scheduler import get_scheduler
+            scheduler = get_scheduler()
+            
+            if not index_str:
+                return False, f"Specify which schedule to {'enable' if enable else 'disable'}."
+            
+            try:
+                index = int(index_str)
+                schedules = scheduler.get_all()
+                
+                if 1 <= index <= len(schedules):
+                    schedule_id = schedules[index - 1].id
+                    if scheduler.enable(schedule_id, enable):
+                        action = "enabled" if enable else "disabled"
+                        return True, f"✅ Schedule {index} {action}."
+                
+                return False, f"Schedule {index} not found."
+            except ValueError:
+                return False, "Invalid schedule number."
+            
+        except Exception as e:
+            return False, f"Could not modify schedule: {e}"
+    
     def _get_help_message(self) -> str:
         """Get help message with available commands."""
         return """Here's what I can do:
@@ -929,7 +1191,17 @@ class CommandExecutor:
 • "Set alarm for 7am"
 • "Set timer for 10 minutes"
 • "Show my reminders"
-• "Delete all reminders"
+
+📋 TASKS:
+• "Run morning routine"
+• "Run focus mode"
+• "Show tasks"
+
+📅 SCHEDULES:
+• "Schedule morning routine daily at 9am"
+• "Schedule break reminder every 2 hours"
+• "Show schedules"
+• "Delete schedule 1"
 
 Just speak naturally!"""
 
