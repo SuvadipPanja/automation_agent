@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ARES Voice Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #1a1a2e;
+            color: #fff;
+            padding: 40px;
+            text-align: center;
+        }
+        h1 { color: #00d9ff; }
+        .box {
+            background: #0d1526;
+            border: 2px solid #00d9ff;
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px auto;
+            max-width: 600px;
+        }
+        button {
+            padding: 20px 40px;
+            font-size: 20px;
+            background: linear-gradient(135deg, #00d9ff, #00ff88);
+            border: none;
+            border-radius: 10px;
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 10px;
+        }
+        button:hover {
+            transform: scale(1.05);
+        }
+        button.stop {
+            background: linear-gradient(135deg, #ff6464, #ff8800);
+        }
+        #status {
+            font-size: 24px;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 10px;
+        }
+        .listening { background: rgba(255,100,100,0.3); color: #ff6464; }
+        .idle { background: rgba(100,100,100,0.3); color: #888; }
+        .success { background: rgba(0,255,136,0.3); color: #00ff88; }
+        .error { background: rgba(255,0,0,0.3); color: #ff4444; }
+        #transcript {
+            font-size: 28px;
+            padding: 30px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 10px;
+            min-height: 100px;
+            margin: 20px 0;
+        }
+        #log {
+            text-align: left;
+            background: #000;
+            padding: 20px;
+            border-radius: 10px;
+            font-family: monospace;
+            font-size: 14px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .log-info { color: #00d9ff; }
+        .log-success { color: #00ff88; }
+        .log-error { color: #ff6464; }
+        .log-warn { color: #ffa500; }
+    </style>
+</head>
+<body>
+    <h1>🎤 ARES Voice Test</h1>
+    
+    <div class="box">
+        <h2>Step 1: Click to Start Listening</h2>
+        <button onclick="startTest()">🎤 START LISTENING</button>
+        <button class="stop" onclick="stopTest()">⏹ STOP</button>
+        
+        <div id="status" class="idle">IDLE - Click START to begin</div>
+        
+        <h3>What I hear:</h3>
+        <div id="transcript">---</div>
+    </div>
+    
+    <div class="box">
+        <h2>Debug Log:</h2>
+        <div id="log"></div>
+    </div>
+    
+    <div class="box">
+        <h2>Test TTS (Text to Speech):</h2>
+        <button onclick="testSpeak()">🔊 Test Speaking</button>
+    </div>
+
+    <script>
+        var recognition = null;
+        var isListening = false;
+        
+        // Log function
+        function log(msg, type) {
+            var logEl = document.getElementById('log');
+            var time = new Date().toLocaleTimeString();
+            var className = 'log-' + (type || 'info');
+            logEl.innerHTML = '<div class="' + className + '">[' + time + '] ' + msg + '</div>' + logEl.innerHTML;
+            console.log(msg);
+        }
+        
+        // Set status
+        function setStatus(text, className) {
+            var el = document.getElementById('status');
+            el.textContent = text;
+            el.className = className;
+        }
+        
+        // Show transcript
+        function showTranscript(text) {
+            document.getElementById('transcript').textContent = text;
+        }
+        
+        // Initialize
+        window.onload = function() {
+            log('Page loaded', 'info');
+            
+            // Check browser support
+            var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            
+            if (!SpeechRecognition) {
+                log('❌ ERROR: Speech Recognition NOT supported in this browser!', 'error');
+                log('Please use Google Chrome or Microsoft Edge', 'error');
+                setStatus('ERROR: Use Chrome browser!', 'error');
+                return;
+            }
+            
+            log('✅ Speech Recognition is supported', 'success');
+            
+            // Create recognition
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognition.lang = 'en-IN';
+            recognition.maxAlternatives = 3;
+            
+            log('Recognition created with lang: en-IN', 'info');
+            
+            // Events
+            recognition.onstart = function() {
+                isListening = true;
+                log('🎤 RECOGNITION STARTED - Speak now!', 'success');
+                setStatus('🎤 LISTENING - Speak now!', 'listening');
+            };
+            
+            recognition.onend = function() {
+                isListening = false;
+                log('Recognition ended', 'info');
+                setStatus('Stopped', 'idle');
+            };
+            
+            recognition.onresult = function(event) {
+                var interim = '';
+                var final = '';
+                
+                for (var i = event.resultIndex; i < event.results.length; i++) {
+                    var transcript = event.results[i][0].transcript;
+                    var confidence = (event.results[i][0].confidence * 100).toFixed(1);
+                    
+                    if (event.results[i].isFinal) {
+                        final = transcript;
+                        log('✅ FINAL: "' + transcript + '" (confidence: ' + confidence + '%)', 'success');
+                    } else {
+                        interim = transcript;
+                        log('... hearing: "' + transcript + '"', 'info');
+                    }
+                }
+                
+                if (interim) {
+                    showTranscript('Hearing: "' + interim + '"');
+                }
+                if (final) {
+                    showTranscript('✅ HEARD: "' + final + '"');
+                    setStatus('✅ Got it!', 'success');
+                }
+            };
+            
+            recognition.onerror = function(event) {
+                log('❌ ERROR: ' + event.error, 'error');
+                
+                if (event.error === 'not-allowed') {
+                    log('Microphone permission DENIED!', 'error');
+                    log('Click the lock icon in address bar and allow microphone', 'warn');
+                    setStatus('❌ Microphone DENIED - Allow in browser!', 'error');
+                } else if (event.error === 'no-speech') {
+                    log('No speech detected - try speaking louder', 'warn');
+                    setStatus('No speech detected - try again', 'idle');
+                } else if (event.error === 'audio-capture') {
+                    log('No microphone found!', 'error');
+                    setStatus('❌ No microphone found!', 'error');
+                } else if (event.error === 'network') {
+                    log('Network error - check internet connection', 'error');
+                    setStatus('❌ Network error', 'error');
+                }
+            };
+            
+            recognition.onspeechstart = function() {
+                log('🗣 Speech detected!', 'success');
+            };
+            
+            recognition.onspeechend = function() {
+                log('Speech ended', 'info');
+            };
+            
+            recognition.onaudiostart = function() {
+                log('🔊 Audio capture started', 'info');
+            };
+            
+            recognition.onaudioend = function() {
+                log('Audio capture ended', 'info');
+            };
+            
+            log('✅ All event handlers attached', 'success');
+            log('Ready! Click START LISTENING button', 'info');
+        };
+        
+        // Start test
+        function startTest() {
+            if (!recognition) {
+                log('❌ Recognition not initialized!', 'error');
+                return;
+            }
+            
+            if (isListening) {
+                log('Already listening', 'warn');
+                return;
+            }
+            
+            log('Starting recognition...', 'info');
+            setStatus('Starting...', 'idle');
+            
+            try {
+                recognition.start();
+                log('recognition.start() called', 'info');
+            } catch(e) {
+                log('❌ Error starting: ' + e.message, 'error');
+            }
+        }
+        
+        // Stop test
+        function stopTest() {
+            if (recognition && isListening) {
+                recognition.stop();
+                log('Stopped by user', 'info');
+            }
+        }
+        
+        // Test speak
+        function testSpeak() {
+            if (!('speechSynthesis' in window)) {
+                log('❌ Text-to-Speech not supported!', 'error');
+                return;
+            }
+            
+            var text = 'Hello! I am ARES. If you can hear me, text to speech is working correctly.';
+            var utterance = new SpeechSynthesisUtterance(text);
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+            utterance.volume = 1.0;
+            
+            utterance.onstart = function() {
+                log('🔊 Speaking...', 'info');
+            };
+            
+            utterance.onend = function() {
+                log('🔊 Done speaking', 'success');
+            };
+            
+            window.speechSynthesis.speak(utterance);
+            log('TTS started', 'info');
+        }
+    </script>
+</body>
+</html>

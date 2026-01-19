@@ -1,0 +1,380 @@
+/**
+ * ARES Voice Assistant Styles
+ * Complete and Working
+ */
+
+/* =====================================================
+   VOICE TOGGLE BUTTON
+   ===================================================== */
+.voice-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+}
+
+.voice-toggle-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    background: rgba(0, 217, 255, 0.1);
+    border: 1px solid rgba(0, 217, 255, 0.3);
+    border-radius: 20px;
+    color: rgba(0, 217, 255, 0.8);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    outline: none;
+}
+
+.voice-toggle-btn:hover {
+    background: rgba(0, 217, 255, 0.2);
+    border-color: #00d9ff;
+    color: #00d9ff;
+}
+
+.voice-toggle-btn.active {
+    background: rgba(0, 255, 136, 0.2);
+    border-color: #00ff88;
+    color: #00ff88;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { box-shadow: 0 0 5px rgba(0, 255, 136, 0.3); }
+    50% { box-shadow: 0 0 20px rgba(0, 255, 136, 0.5); }
+}
+
+/* =====================================================
+   SETTINGS BUTTON
+   ===================================================== */
+.voice-settings-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 18px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    outline: none;
+}
+
+.voice-settings-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.3);
+    color: #fff;
+    transform: rotate(45deg);
+}
+
+/* =====================================================
+   SETTINGS OVERLAY
+   ===================================================== */
+.settings-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(5px);
+    z-index: 9998;
+    display: block;
+}
+
+.settings-overlay.hidden {
+    display: none !important;
+}
+
+/* =====================================================
+   SETTINGS PANEL
+   ===================================================== */
+.settings-panel {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-width: 420px;
+    max-height: 80vh;
+    background: linear-gradient(180deg, #0d1520 0%, #0a0f18 100%);
+    border: 1px solid rgba(0, 217, 255, 0.4);
+    border-radius: 16px;
+    box-shadow: 0 25px 80px rgba(0, 0, 0, 0.8), 
+                0 0 60px rgba(0, 217, 255, 0.15);
+    z-index: 9999;
+    overflow: hidden;
+    display: block;
+}
+
+.settings-panel.hidden {
+    display: none !important;
+}
+
+/* Header */
+.settings-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    background: rgba(0, 217, 255, 0.1);
+    border-bottom: 1px solid rgba(0, 217, 255, 0.2);
+}
+
+.settings-header h2 {
+    margin: 0;
+    color: #00d9ff;
+    font-size: 18px;
+    font-weight: 500;
+}
+
+.close-btn {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    border-radius: 50%;
+    color: #fff;
+    font-size: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.close-btn:hover {
+    background: rgba(255, 100, 100, 0.3);
+    color: #ff6464;
+}
+
+/* Content */
+.settings-content {
+    padding: 20px;
+    max-height: calc(80vh - 60px);
+    overflow-y: auto;
+}
+
+.settings-section {
+    margin-bottom: 24px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.settings-section:last-child {
+    margin-bottom: 0;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.settings-section h3 {
+    color: #00d9ff;
+    font-size: 14px;
+    font-weight: 500;
+    margin: 0 0 16px 0;
+}
+
+/* Setting Items */
+.setting-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    gap: 12px;
+}
+
+.setting-item:last-child {
+    margin-bottom: 0;
+}
+
+.setting-item label {
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 14px;
+}
+
+.setting-item select {
+    flex: 1;
+    max-width: 200px;
+    padding: 10px 12px;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(0, 217, 255, 0.3);
+    border-radius: 8px;
+    color: #fff;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.setting-item select:focus {
+    outline: none;
+    border-color: #00d9ff;
+}
+
+.setting-item select option {
+    background: #1a1a2e;
+    color: #fff;
+}
+
+/* Range Slider */
+.setting-item input[type="range"] {
+    flex: 1;
+    max-width: 150px;
+    height: 6px;
+    -webkit-appearance: none;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.setting-item input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    background: #00d9ff;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+/* Toggle Switch */
+.switch {
+    position: relative;
+    width: 50px;
+    height: 26px;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.switch .slider {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 26px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.switch .slider:before {
+    content: "";
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    left: 3px;
+    bottom: 3px;
+    background: white;
+    border-radius: 50%;
+    transition: 0.3s;
+}
+
+.switch input:checked + .slider {
+    background: #00d9ff;
+}
+
+.switch input:checked + .slider:before {
+    transform: translateX(24px);
+}
+
+/* Test Buttons */
+.test-btn {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 10px;
+    background: rgba(0, 217, 255, 0.1);
+    border: 1px solid rgba(0, 217, 255, 0.3);
+    border-radius: 8px;
+    color: #00d9ff;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.test-btn:last-child {
+    margin-bottom: 0;
+}
+
+.test-btn:hover {
+    background: rgba(0, 217, 255, 0.2);
+    transform: translateY(-2px);
+}
+
+/* =====================================================
+   VOICE VISUALIZER
+   ===================================================== */
+.voice-visualizer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    height: 50px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    padding: 0 16px;
+}
+
+.wave-bar {
+    width: 5px;
+    height: 15px;
+    background: linear-gradient(to top, #00d9ff, #00ffcc);
+    border-radius: 3px;
+    animation: wave 0.8s ease-in-out infinite;
+    animation-play-state: paused;
+}
+
+.voice-visualizer.active .wave-bar {
+    animation-play-state: running;
+}
+
+.wave-bar:nth-child(1) { animation-delay: 0s; }
+.wave-bar:nth-child(2) { animation-delay: 0.1s; }
+.wave-bar:nth-child(3) { animation-delay: 0.2s; }
+.wave-bar:nth-child(4) { animation-delay: 0.3s; }
+.wave-bar:nth-child(5) { animation-delay: 0.4s; }
+.wave-bar:nth-child(6) { animation-delay: 0.3s; }
+.wave-bar:nth-child(7) { animation-delay: 0.2s; }
+.wave-bar:nth-child(8) { animation-delay: 0.1s; }
+
+@keyframes wave {
+    0%, 100% { height: 8px; opacity: 0.5; }
+    50% { height: 30px; opacity: 1; }
+}
+
+/* =====================================================
+   MICROPHONE BUTTON STATE
+   ===================================================== */
+.btn-voice.listening {
+    background: rgba(255, 100, 100, 0.3) !important;
+    border-color: #ff6464 !important;
+    color: #ff6464 !important;
+}
+
+/* =====================================================
+   MOBILE RESPONSIVE
+   ===================================================== */
+@media (max-width: 768px) {
+    .voice-controls {
+        width: 100%;
+        justify-content: center;
+        margin-top: 8px;
+    }
+    
+    .voice-toggle-btn {
+        flex: 1;
+        justify-content: center;
+    }
+    
+    .settings-panel {
+        width: 95%;
+        max-height: 85vh;
+    }
+}

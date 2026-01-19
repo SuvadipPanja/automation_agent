@@ -1,31 +1,38 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <title>ARES – Autonomous Runtime AI Agent</title>
-    <link rel="stylesheet" href="/static/style.css" />
+    <meta charset="UTF-8">
+    <title>ARES</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 
 <div class="container">
-    <h1 class="title">ARES</h1>
+    <h1>ARES</h1>
     <p class="subtitle">Autonomous Runtime AI Agent</p>
-    <p class="status" id="status">IDLE</p>
 
-    <div class="command-box">
+    <!-- STATUS -->
+    <div id="status" class="status idle">IDLE</div>
+
+    <!-- INPUT BAR -->
+    <div class="input-row">
         <input
-            type="text"
             id="commandInput"
+            type="text"
             placeholder="Speak or type a command..."
-        />
+        >
         <button onclick="sendCommand()">▶</button>
+        <button onclick="sendVoice()">🎤</button>
     </div>
 
-    <pre id="responseBox" class="response">
+    <!-- RESPONSE BOX -->
+    <pre id="responseBox" class="output">
 ARES online. Awaiting command.
     </pre>
 
-    <div class="footer">
+    <!-- ACTION BUTTONS -->
+    <div class="actions">
         <button onclick="checkHealth()">Health</button>
         <button onclick="loadTasks()">Tasks</button>
         <button onclick="loadSchedules()">Schedules</button>
@@ -33,6 +40,6 @@ ARES online. Awaiting command.
     </div>
 </div>
 
-<script src="/static/app.js"></script>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>

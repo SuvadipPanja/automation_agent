@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARES - AI Voice Assistant</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* =====================================================
+           ARES JARVIS-LIKE UI - BEAUTIFUL & FUNCTIONAL
+           ===================================================== */
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background: linear-gradient(135deg, #0a0a1a 0%, #0d1526 50%, #0a1628 100%);
+            min-height: 100vh;
+            color: #fff;
+            overflow-x: hidden;
+        }
+        
+        /* Animated Background */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                radial-gradient(ellipse at 20% 80%, rgba(0, 217, 255, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 20%, rgba(0, 255, 136, 0.06) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(138, 43, 226, 0.04) 0%, transparent 60%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        /* Grid Lines */
+        .grid-lines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(rgba(0, 217, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 217, 255, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        /* Main Container */
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 30px;
+            background: rgba(0, 20, 40, 0.6);
+            border: 1px solid rgba(0, 217, 255, 0.2);
+            border-radius: 16px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .logo-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #00d9ff, #00ff88);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #000;
+            box-shadow: 0 0 30px rgba(0, 217, 255, 0.4);
+        }
+        
+        .logo h1 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 32px;
+            font-weight: 700;
+            background: linear-gradient(90deg, #00d9ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 4px;
+        }
+        
+        .logo span {
+            display: block;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.5);
+            letter-spacing: 2px;
+            margin-top: -5px;
+        }
+        
+        .header-status {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+            border-radius: 20px;
+            font-size: 14px;
+            color: #00ff88;
+        }
+        
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background: #00ff88;
+            border-radius: 50%;
+            animation: pulse-dot 2s infinite;
+        }
+        
+        @keyframes pulse-dot {
+            0%, 100% { opacity: 1; box-shadow: 0 0 5px #00ff88; }
+            50% { opacity: 0.5; box-shadow: 0 0 15px #00ff88; }
+        }
+        
+        .time-display {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 18px;
+            color: rgba(255, 255, 255, 0.7);
+        }
+        
+        /* Main Content */
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            flex: 1;
+        }
+        
+        /* AI Core Section */
+        .ai-core-section {
+            background: rgba(0, 20, 40, 0.6);
+            border: 1px solid rgba(0, 217, 255, 0.2);
+            border-radius: 16px;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            backdrop-filter: blur(10px);
+        }
+        
+        .ai-core {
+            position: relative;
+            width: 250px;
+            height: 250px;
+            margin-bottom: 30px;
+        }
+        
+        .core-rings {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        .ring {
+            position: absolute;
+            border: 2px solid rgba(0, 217, 255, 0.3);
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        .ring-1 { width: 200px; height: 200px; animation: rotate 20s linear infinite; }
+        .ring-2 { width: 160px; height: 160px; animation: rotate 15s linear infinite reverse; border-color: rgba(0, 255, 136, 0.3); }
+        .ring-3 { width: 120px; height: 120px; animation: rotate 10s linear infinite; border-color: rgba(138, 43, 226, 0.3); }
+        
+        @keyframes rotate {
+            from { transform: translate(-50%, -50%) rotate(0deg); }
+            to { transform: translate(-50%, -50%) rotate(360deg); }
+        }
+        
+        .core-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80px;
+            height: 80px;
+            background: radial-gradient(circle, rgba(0, 217, 255, 0.8), rgba(0, 217, 255, 0.2));
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 60px rgba(0, 217, 255, 0.5);
+            transition: all 0.5s ease;
+        }
+        
+        .core-center.listening {
+            background: radial-gradient(circle, rgba(255, 100, 100, 0.8), rgba(255, 100, 100, 0.2));
+            box-shadow: 0 0 60px rgba(255, 100, 100, 0.6);
+            animation: pulse-core 1s infinite;
+        }
+        
+        .core-center.speaking {
+            background: radial-gradient(circle, rgba(0, 255, 136, 0.8), rgba(0, 255, 136, 0.2));
+            box-shadow: 0 0 60px rgba(0, 255, 136, 0.6);
+            animation: pulse-core 0.5s infinite;
+        }
+        
+        .core-center.processing {
+            background: radial-gradient(circle, rgba(255, 200, 0, 0.8), rgba(255, 200, 0, 0.2));
+            box-shadow: 0 0 60px rgba(255, 200, 0, 0.6);
+            animation: pulse-core 0.3s infinite;
+        }
+        
+        @keyframes pulse-core {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.1); }
+        }
+        
+        .core-status-text {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 14px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 10px currentColor;
+        }
+        
+        /* Voice Visualizer */
+        .voice-visualizer {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            height: 60px;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        
+        .viz-bar {
+            width: 8px;
+            height: 20px;
+            background: linear-gradient(to top, #00d9ff, #00ff88);
+            border-radius: 4px;
+            transition: height 0.1s ease;
+        }
+        
+        .visualizer-active .viz-bar {
+            animation: viz-wave 0.5s ease-in-out infinite;
+        }
+        
+        .viz-bar:nth-child(1) { animation-delay: 0s; }
+        .viz-bar:nth-child(2) { animation-delay: 0.1s; }
+        .viz-bar:nth-child(3) { animation-delay: 0.2s; }
+        .viz-bar:nth-child(4) { animation-delay: 0.3s; }
+        .viz-bar:nth-child(5) { animation-delay: 0.4s; }
+        .viz-bar:nth-child(6) { animation-delay: 0.5s; }
+        .viz-bar:nth-child(7) { animation-delay: 0.4s; }
+        .viz-bar:nth-child(8) { animation-delay: 0.3s; }
+        .viz-bar:nth-child(9) { animation-delay: 0.2s; }
+        .viz-bar:nth-child(10) { animation-delay: 0.1s; }
+        
+        @keyframes viz-wave {
+            0%, 100% { height: 10px; opacity: 0.5; }
+            50% { height: 50px; opacity: 1; }
+        }
+        
+        /* Voice Control Buttons */
+        .voice-controls {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .btn {
+            padding: 15px 30px;
+            border-radius: 12px;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border: none;
+            outline: none;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, rgba(0, 217, 255, 0.3), rgba(0, 217, 255, 0.1));
+            border: 2px solid #00d9ff;
+            color: #00d9ff;
+        }
+        
+        .btn-primary:hover {
+            background: linear-gradient(135deg, rgba(0, 217, 255, 0.5), rgba(0, 217, 255, 0.2));
+            box-shadow: 0 0 30px rgba(0, 217, 255, 0.4);
+            transform: translateY(-2px);
+        }
+        
+        .btn-primary.active {
+            background: linear-gradient(135deg, rgba(0, 255, 136, 0.5), rgba(0, 255, 136, 0.2));
+            border-color: #00ff88;
+            color: #00ff88;
+            box-shadow: 0 0 30px rgba(0, 255, 136, 0.4);
+        }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: rgba(255, 255, 255, 0.7);
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+        
+        /* Response Section */
+        .response-section {
+            background: rgba(0, 20, 40, 0.6);
+            border: 1px solid rgba(0, 217, 255, 0.2);
+            border-radius: 16px;
+            padding: 25px;
+            display: flex;
+            flex-direction: column;
+            backdrop-filter: blur(10px);
+        }
+        
+        .section-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.5);
+            margin-bottom: 15px;
+            letter-spacing: 2px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .section-title::before {
+            content: '';
+            width: 4px;
+            height: 20px;
+            background: linear-gradient(to bottom, #00d9ff, #00ff88);
+            border-radius: 2px;
+        }
+        
+        /* Live Transcript Box */
+        .transcript-box {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 200, 0, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            min-height: 80px;
+        }
+        
+        .transcript-label {
+            font-size: 12px;
+            color: #ffc800;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .transcript-label .icon {
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        
+        .transcript-text {
+            font-size: 18px;
+            color: #fff;
+            line-height: 1.5;
+        }
+        
+        .transcript-text.interim {
+            color: rgba(255, 255, 255, 0.6);
+            font-style: italic;
+        }
+        
+        /* Processing Box */
+        .processing-box {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(138, 43, 226, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            min-height: 60px;
+            display: none;
+        }
+        
+        .processing-box.active {
+            display: block;
+        }
+        
+        .processing-label {
+            font-size: 12px;
+            color: #8a2be2;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .processing-dots {
+            display: inline-flex;
+            gap: 4px;
+        }
+        
+        .processing-dots span {
+            width: 8px;
+            height: 8px;
+            background: #8a2be2;
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out;
+        }
+        
+        .processing-dots span:nth-child(1) { animation-delay: 0s; }
+        .processing-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .processing-dots span:nth-child(3) { animation-delay: 0.4s; }
+        
+        @keyframes bounce {
+            0%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-10px); }
+        }
+        
+        /* Response Box */
+        .response-box {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(0, 255, 136, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            flex: 1;
+            min-height: 150px;
+            overflow-y: auto;
+        }
+        
+        .response-label {
+            font-size: 12px;
+            color: #00ff88;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .response-text {
+            font-size: 16px;
+            color: #fff;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+        
+        /* Command Input */
+        .command-input-section {
+            margin-top: 15px;
+        }
+        
+        .command-input-wrapper {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .command-input {
+            flex: 1;
+            padding: 15px 20px;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(0, 217, 255, 0.3);
+            border-radius: 12px;
+            color: #fff;
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 16px;
+            outline: none;
+            transition: all 0.3s ease;
+        }
+        
+        .command-input:focus {
+            border-color: #00d9ff;
+            box-shadow: 0 0 20px rgba(0, 217, 255, 0.2);
+        }
+        
+        .command-input::placeholder {
+            color: rgba(255, 255, 255, 0.3);
+        }
+        
+        .btn-send {
+            padding: 15px 25px;
+            background: linear-gradient(135deg, #00d9ff, #00ff88);
+            border: none;
+            border-radius: 12px;
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-send:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 30px rgba(0, 217, 255, 0.5);
+        }
+        
+        /* Quick Actions */
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .quick-btn {
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+        
+        .quick-btn:hover {
+            background: rgba(0, 217, 255, 0.1);
+            border-color: rgba(0, 217, 255, 0.3);
+            color: #00d9ff;
+        }
+        
+        /* Settings Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-overlay.active {
+            display: flex;
+        }
+        
+        .modal {
+            background: linear-gradient(180deg, #0d1526 0%, #0a0f18 100%);
+            border: 1px solid rgba(0, 217, 255, 0.3);
+            border-radius: 20px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow: hidden;
+            box-shadow: 0 30px 100px rgba(0, 0, 0, 0.8);
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 25px;
+            background: rgba(0, 217, 255, 0.1);
+            border-bottom: 1px solid rgba(0, 217, 255, 0.2);
+        }
+        
+        .modal-header h2 {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 18px;
+            color: #00d9ff;
+        }
+        
+        .modal-close {
+            width: 36px;
+            height: 36px;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 50%;
+            color: #fff;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .modal-close:hover {
+            background: rgba(255, 100, 100, 0.3);
+            color: #ff6464;
+        }
+        
+        .modal-content {
+            padding: 25px;
+            overflow-y: auto;
+            max-height: calc(80vh - 80px);
+        }
+        
+        .setting-group {
+            margin-bottom: 25px;
+        }
+        
+        .setting-group h3 {
+            font-size: 14px;
+            color: #00d9ff;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .setting-label {
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 14px;
+        }
+        
+        .setting-control select {
+            padding: 10px 15px;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(0, 217, 255, 0.3);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+            min-width: 180px;
+            cursor: pointer;
+        }
+        
+        .setting-control select:focus {
+            outline: none;
+            border-color: #00d9ff;
+        }
+        
+        .setting-control input[type="range"] {
+            width: 150px;
+            height: 6px;
+            -webkit-appearance: none;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        
+        .setting-control input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: #00d9ff;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        
+        /* Toggle Switch */
+        .toggle {
+            position: relative;
+            width: 50px;
+            height: 26px;
+        }
+        
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .toggle-slider {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 26px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        
+        .toggle-slider:before {
+            content: "";
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            left: 3px;
+            bottom: 3px;
+            background: white;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+        
+        .toggle input:checked + .toggle-slider {
+            background: linear-gradient(135deg, #00d9ff, #00ff88);
+        }
+        
+        .toggle input:checked + .toggle-slider:before {
+            transform: translateX(24px);
+        }
+        
+        .test-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .test-btn {
+            flex: 1;
+            padding: 12px;
+            background: rgba(0, 217, 255, 0.1);
+            border: 1px solid rgba(0, 217, 255, 0.3);
+            border-radius: 8px;
+            color: #00d9ff;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .test-btn:hover {
+            background: rgba(0, 217, 255, 0.2);
+        }
+        
+        /* Footer */
+        .footer {
+            margin-top: 20px;
+            padding: 15px 30px;
+            background: rgba(0, 20, 40, 0.6);
+            border: 1px solid rgba(0, 217, 255, 0.2);
+            border-radius: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(10px);
+        }
+        
+        .footer-info {
+            display: flex;
+            gap: 30px;
+            font-size: 13px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+        
+        .footer-info span {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .footer-info .value {
+            color: #00d9ff;
+        }
+        
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .quick-actions {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (max-width: 600px) {
+            .header {
+                flex-direction: column;
+                gap: 15px;
+                text-align: center;
+            }
+            
+            .voice-controls {
+                flex-direction: column;
+                width: 100%;
+            }
+            
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-animation"></div>
+    <div class="grid-lines"></div>
+    
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <div class="logo-icon">A</div>
+                <div>
+                    <h1>ARES</h1>
+                    <span>AUTONOMOUS AI ASSISTANT</span>
+                </div>
+            </div>
+            <div class="header-status">
+                <div class="status-badge">
+                    <div class="status-dot"></div>
+                    <span id="systemStatus">ONLINE</span>
+                </div>
+                <div class="time-display" id="timeDisplay">00:00:00</div>
+            </div>
+        </header>
+        
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- AI Core Section -->
+            <div class="ai-core-section">
+                <div class="section-title">AI CORE</div>
+                
+                <div class="ai-core">
+                    <div class="core-rings">
+                        <div class="ring ring-1"></div>
+                        <div class="ring ring-2"></div>
+                        <div class="ring ring-3"></div>
+                    </div>
+                    <div class="core-center" id="coreCenter">
+                        <span class="core-status-text" id="coreStatus">IDLE</span>
+                    </div>
+                </div>
+                
+                <div class="voice-visualizer" id="voiceVisualizer">
+                    <div class="viz-bar"></div>
+                    <div class="viz-bar"></div>
+                    <div class="viz-bar"></div>
+                    <div class="viz-bar"></div>
+                    <div class="viz-bar"></div>
+                    <div class="viz-bar"></div>
+                    <div class="viz-bar"></div>
+                    <div class="viz-bar"></div>
+                    <div class="viz-bar"></div>
+                    <div class="viz-bar"></div>
+                </div>
+                
+                <div class="voice-controls">
+                    <button class="btn btn-primary" id="voiceToggleBtn" onclick="toggleVoice()">
+                        🎤 <span id="voiceToggleText">START LISTENING</span>
+                    </button>
+                    <button class="btn btn-secondary" onclick="openSettings()">
+                        ⚙️ Settings
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Response Section -->
+            <div class="response-section">
+                <div class="section-title">ARES RESPONSE</div>
+                
+                <!-- What ARES is hearing -->
+                <div class="transcript-box" id="transcriptBox">
+                    <div class="transcript-label">
+                        <span class="icon">🎤</span> HEARING
+                    </div>
+                    <div class="transcript-text" id="transcriptText">
+                        Click "START LISTENING" and speak...
+                    </div>
+                </div>
+                
+                <!-- Processing indicator -->
+                <div class="processing-box" id="processingBox">
+                    <div class="processing-label">
+                        <span>🧠</span> PROCESSING
+                        <div class="processing-dots">
+                            <span></span>
+                            <span></span>
+                            <span></span>
+                        </div>
+                    </div>
+                    <div id="processingText">Analyzing your request...</div>
+                </div>
+                
+                <!-- ARES Response -->
+                <div class="response-box">
+                    <div class="response-label">
+                        <span>💬</span> ARES RESPONSE
+                    </div>
+                    <div class="response-text" id="responseText">
+                        Hello! I am ARES, your AI assistant. 
+                        
+Click "START LISTENING" or type a command below to interact with me.
+
+Say "Hey ARES" followed by your command, or disable wake word in settings to respond to everything you say.
+                    </div>
+                </div>
+                
+                <!-- Command Input -->
+                <div class="command-input-section">
+                    <div class="command-input-wrapper">
+                        <input type="text" class="command-input" id="commandInput" 
+                               placeholder="Type a command or question..." 
+                               onkeypress="if(event.key==='Enter')sendCommand()">
+                        <button class="btn-send" onclick="sendCommand()">SEND ▶</button>
+                    </div>
+                </div>
+                
+                <!-- Quick Actions -->
+                <div class="quick-actions">
+                    <button class="quick-btn" onclick="sendQuickCommand('What can you do?')">💡 Capabilities</button>
+                    <button class="quick-btn" onclick="sendQuickCommand('What time is it?')">🕐 Time</button>
+                    <button class="quick-btn" onclick="sendQuickCommand('Tell me a joke')">😄 Joke</button>
+                    <button class="quick-btn" onclick="checkHealth()">❤️ Health</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-info">
+                <span>Version: <span class="value">2.0</span></span>
+                <span>Mode: <span class="value">Development</span></span>
+                <span>Connection: <span class="value" id="connectionStatus">Local</span></span>
+            </div>
+        </footer>
+    </div>
+    
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2>🎤 Voice Settings</h2>
+                <button class="modal-close" onclick="closeSettings()">×</button>
+            </div>
+            <div class="modal-content">
+                <div class="setting-group">
+                    <h3>🎙️ Voice Input</h3>
+                    <div class="setting-row">
+                        <span class="setting-label">Wake Word ("Hey ARES")</span>
+                        <label class="toggle">
+                            <input type="checkbox" id="wakeWordToggle" checked onchange="updateWakeWord(this.checked)">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="setting-row">
+                        <span class="setting-label">Language</span>
+                        <div class="setting-control">
+                            <select id="languageSelect" onchange="updateLanguage(this.value)">
+                                <option value="en-IN" selected>English (India)</option>
+                                <option value="en-US">English (US)</option>
+                                <option value="en-GB">English (UK)</option>
+                                <option value="hi-IN">Hindi</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="setting-group">
+                    <h3>🔊 Voice Output</h3>
+                    <div class="setting-row">
+                        <span class="setting-label">Voice</span>
+                        <div class="setting-control">
+                            <select id="voiceSelect" onchange="updateVoice(this.value)">
+                                <option value="">Loading voices...</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="setting-row">
+                        <span class="setting-label">Speed: <span id="speedValue">1.0</span>x</span>
+                        <div class="setting-control">
+                            <input type="range" id="speedRange" min="0.5" max="2" step="0.1" value="1" 
+                                   oninput="updateSpeed(this.value)">
+                        </div>
+                    </div>
+                    <div class="setting-row">
+                        <span class="setting-label">Pitch: <span id="pitchValue">1.0</span></span>
+                        <div class="setting-control">
+                            <input type="range" id="pitchRange" min="0.5" max="2" step="0.1" value="1" 
+                                   oninput="updatePitch(this.value)">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="test-buttons">
+                    <button class="test-btn" onclick="testVoiceOutput()">🔊 Test Voice</button>
+                    <button class="test-btn" onclick="testMicrophone()">🎤 Test Mic</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="/static/voice.js"></script>
+</body>
+</html>

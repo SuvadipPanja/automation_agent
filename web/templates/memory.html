@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ARES Memory - Profile & History</title>
+    <link rel="stylesheet" href="/static/style_modern.css" />
+    <style>
+        .memory-container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 2rem;
+        }
+        
+        .memory-section {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .memory-section h2 {
+            color: var(--primary-color);
+            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+        }
+        
+        .info-card {
+            background: rgba(0, 217, 255, 0.05);
+            padding: 1rem;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+        }
+        
+        .info-label {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .info-value {
+            color: var(--text-primary);
+            font-size: 1.1rem;
+        }
+        
+        .conversation-item {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 1rem;
+            border-radius: var(--radius-md);
+            margin-bottom: 1rem;
+            border-left: 3px solid var(--primary-color);
+        }
+        
+        .conversation-user {
+            color: var(--accent-color);
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        
+        .conversation-ares {
+            color: var(--text-primary);
+        }
+        
+        .conversation-time {
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            margin-top: 0.5rem;
+        }
+        
+        .btn-danger {
+            background: var(--error-color);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        
+        .btn-danger:hover {
+            opacity: 0.8;
+        }
+        
+        .btn-secondary {
+            background: rgba(0, 217, 255, 0.2);
+            color: var(--primary-color);
+            border: 1px solid var(--primary-color);
+            padding: 0.75rem 1.5rem;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(0, 217, 255, 0.3);
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .empty-state {
+            text-align: center;
+            color: var(--text-secondary);
+            padding: 2rem;
+        }
+        
+        .fact-item {
+            background: rgba(0, 217, 255, 0.05);
+            padding: 0.75rem;
+            border-radius: var(--radius-sm);
+            margin-bottom: 0.5rem;
+            border-left: 2px solid var(--accent-color);
+        }
+        
+        .preference-category {
+            margin-bottom: 1rem;
+        }
+        
+        .preference-label {
+            color: var(--primary-color);
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+        
+        .preference-items {
+            color: var(--text-primary);
+            padding-left: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="grid-background"></div>
+    
+    <div class="main-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo-section">
+                <div class="logo-icon">◈</div>
+                <div class="logo-text">
+                    <h1>ARES MEMORY</h1>
+                    <span class="tagline">Profile & Conversation History</span>
+                </div>
+            </div>
+            <div class="system-status">
+                <a href="/" style="color: var(--primary-color); text-decoration: none;">
+                    ← Back to ARES
+                </a>
+            </div>
+        </header>
+
+        <div class="memory-container">
+            <!-- User Profile Section -->
+            <div class="memory-section">
+                <h2>
+                    <span>👤</span> User Profile
+                </h2>
+                <div id="profileContent" class="info-grid">
+                    <div class="empty-state">Loading profile...</div>
+                </div>
+                <div class="action-buttons">
+                    <button class="btn-secondary" onclick="refreshProfile()">🔄 Refresh</button>
+                    <button class="btn-danger" onclick="clearAllMemory()">🗑️ Clear All Memory</button>
+                </div>
+            </div>
+
+            <!-- Preferences Section -->
+            <div class="memory-section">
+                <h2>
+                    <span>⭐</span> Learned Preferences
+                </h2>
+                <div id="preferencesContent">
+                    <div class="empty-state">Loading preferences...</div>
+                </div>
+            </div>
+
+            <!-- Facts Section -->
+            <div class="memory-section">
+                <h2>
+                    <span>💡</span> Important Facts
+                </h2>
+                <div id="factsContent">
+                    <div class="empty-state">Loading facts...</div>
+                </div>
+            </div>
+
+            <!-- Conversation History -->
+            <div class="memory-section">
+                <h2>
+                    <span>💬</span> Recent Conversations
+                </h2>
+                <div id="conversationsContent">
+                    <div class="empty-state">Loading conversations...</div>
+                </div>
+                <div class="action-buttons">
+                    <button class="btn-secondary" onclick="loadConversations()">🔄 Refresh</button>
+                    <button class="btn-danger" onclick="clearConversations()">🗑️ Clear Conversations</button>
+                    <button class="btn-secondary" onclick="exportMemory()">📥 Export Data</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Load all memory data on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadProfile();
+            loadConversations();
+        });
+
+        async function loadProfile() {
+            try {
+                const response = await fetch('/memory/profile');
+                const data = await response.json();
+                
+                // Display profile
+                const profileEl = document.getElementById('profileContent');
+                if (Object.keys(data.profile).length === 0) {
+                    profileEl.innerHTML = '<div class="empty-state">No profile information yet. Start chatting with ARES to build your profile!</div>';
+                } else {
+                    let html = '';
+                    for (const [key, value] of Object.entries(data.profile)) {
+                        html += `
+                            <div class="info-card">
+                                <div class="info-label">${key}</div>
+                                <div class="info-value">${value}</div>
+                            </div>
+                        `;
+                    }
+                    profileEl.innerHTML = html;
+                }
+                
+                // Display preferences
+                const prefsEl = document.getElementById('preferencesContent');
+                if (Object.keys(data.preferences).length === 0) {
+                    prefsEl.innerHTML = '<div class="empty-state">No preferences learned yet.</div>';
+                } else {
+                    let html = '';
+                    for (const [category, items] of Object.entries(data.preferences)) {
+                        html += `
+                            <div class="preference-category">
+                                <div class="preference-label">${category}:</div>
+                                <div class="preference-items">${items.join(', ')}</div>
+                            </div>
+                        `;
+                    }
+                    prefsEl.innerHTML = html;
+                }
+                
+                // Display facts
+                const factsEl = document.getElementById('factsContent');
+                if (data.facts.length === 0) {
+                    factsEl.innerHTML = '<div class="empty-state">No important facts stored yet.</div>';
+                } else {
+                    let html = '';
+                    for (const fact of data.facts) {
+                        html += `<div class="fact-item">${fact}</div>`;
+                    }
+                    factsEl.innerHTML = html;
+                }
+                
+            } catch (error) {
+                console.error('Error loading profile:', error);
+            }
+        }
+
+        async function loadConversations() {
+            try {
+                const response = await fetch('/memory/conversations?limit=10');
+                const data = await response.json();
+                
+                const convosEl = document.getElementById('conversationsContent');
+                if (data.conversations.length === 0) {
+                    convosEl.innerHTML = '<div class="empty-state">No conversations yet. Start chatting with ARES!</div>';
+                } else {
+                    let html = '';
+                    for (const convo of data.conversations) {
+                        html += `
+                            <div class="conversation-item">
+                                <div class="conversation-user">You: ${convo.user}</div>
+                                <div class="conversation-ares">ARES: ${convo.ares}</div>
+                                <div class="conversation-time">${new Date(convo.timestamp).toLocaleString()}</div>
+                            </div>
+                        `;
+                    }
+                    convosEl.innerHTML = html;
+                }
+                
+            } catch (error) {
+                console.error('Error loading conversations:', error);
+            }
+        }
+
+        function refreshProfile() {
+            loadProfile();
+        }
+
+        async function clearConversations() {
+            if (!confirm('Are you sure you want to clear all conversation history? This cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                await fetch('/memory/clear-conversations', { method: 'POST' });
+                alert('Conversations cleared successfully!');
+                loadConversations();
+            } catch (error) {
+                alert('Error clearing conversations: ' + error.message);
+            }
+        }
+
+        async function clearAllMemory() {
+            if (!confirm('⚠️ WARNING: This will delete ALL memory including your profile, preferences, and conversations. This cannot be undone. Are you sure?')) {
+                return;
+            }
+            
+            if (!confirm('Really delete EVERYTHING? Type YES in the next prompt.')) {
+                return;
+            }
+            
+            const confirmation = prompt('Type YES to confirm complete memory wipe:');
+            if (confirmation !== 'YES') {
+                alert('Cancelled.');
+                return;
+            }
+            
+            try {
+                await fetch('/memory/clear-all', { method: 'POST' });
+                alert('All memory cleared successfully!');
+                loadProfile();
+                loadConversations();
+            } catch (error) {
+                alert('Error clearing memory: ' + error.message);
+            }
+        }
+
+        async function exportMemory() {
+            try {
+                const response = await fetch('/memory/export');
+                const data = await response.json();
+                
+                // Create download
+                const dataStr = JSON.stringify(data, null, 2);
+                const dataBlob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(dataBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `ares_memory_${new Date().toISOString()}.json`;
+                link.click();
+                
+                alert('Memory exported successfully!');
+            } catch (error) {
+                alert('Error exporting memory: ' + error.message);
+            }
+        }
+    </script>
+</body>
+</html>

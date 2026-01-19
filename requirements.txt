@@ -1,12 +1,45 @@
-schedule
+# ARES - Autonomous Runtime AI Agent
+# Dependencies
+
+# Core
+flask
 pyyaml
+requests
+
+# Scheduling
+schedule
+
+# Voice Assistant - Whisper (RECOMMENDED)
+faster-whisper
+sounddevice
+numpy
+scipy
+
+# Voice Assistant - TTS
 pyttsx3
+
+# Voice Assistant - Legacy (optional)
+SpeechRecognition
+# pyaudio  # Often problematic, sounddevice is better
+
+# AI / LLM
+openai
+
+# Browser Automation (for future)
 selenium
 webdriver-manager
+
+# Email (for future)
 imapclient
-flask
-openai
-requests
-pyyaml
 
-
+# Note: pyaudio installation on Windows
+# If pip install pyaudio fails, try:
+#   pip install pipwin
+#   pipwin install pyaudio
+#
+# On Linux:
+#   sudo apt-get install portaudio19-dev python3-pyaudio
+#
+# On Mac:
+#   brew install portaudio
+#   pip install pyaudio
