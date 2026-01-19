@@ -1,6 +1,6 @@
 """
 =====================================================
-ARES REMINDER & ALARM SYSTEM
+ARES REMINDER & ALARM SYSTEM - FIXED
 =====================================================
 Complete reminder, alarm, and timer functionality.
 
@@ -9,7 +9,7 @@ Features:
 ✅ Relative reminders ("remind me in 30 minutes")
 ✅ Recurring daily reminders
 ✅ Alarms with sound
-✅ Countdown timers
+✅ Countdown timers - FIXED
 ✅ Persistent storage (survives restart)
 ✅ Natural language parsing
 
@@ -128,20 +128,26 @@ class ReminderManager:
         self._thread: Optional[threading.Thread] = None
         
         self._load()
-        print(f"  ✅ Reminder system ({len(self.reminders)} active)")
+        print(f"  ✅ Reminder system initialized ({len(self.reminders)} active)")
     
     def _load(self):
+        """Load reminders from storage"""
         if self.storage_path.exists():
             try:
                 with open(self.storage_path, 'r') as f:
                     data = json.load(f)
                     self.reminders = [Reminder.from_dict(r) for r in data]
+                    # Keep only active reminders
                     self.reminders = [r for r in self.reminders if r.status == "active"]
+                    print(f"  📥 Loaded {len(self.reminders)} reminders from storage")
             except Exception as e:
                 print(f"  ⚠️ Could not load reminders: {e}")
                 self.reminders = []
+        else:
+            print(f"  📝 No existing reminders (new database)")
     
     def _save(self):
+        """Save reminders to storage"""
         try:
             with open(self.storage_path, 'w') as f:
                 json.dump([r.to_dict() for r in self.reminders], f, indent=2)
@@ -151,6 +157,7 @@ class ReminderManager:
     def add(self, message: str, trigger_time: datetime.datetime, 
             reminder_type: str = "reminder", recurring: bool = False,
             recurring_time: str = None) -> Reminder:
+        """Add a new reminder/alarm/timer"""
         reminder = Reminder(
             id=str(uuid.uuid4())[:8],
             message=message,
@@ -161,11 +168,13 @@ class ReminderManager:
         )
         self.reminders.append(reminder)
         self._save()
+        print(f"  ✅ Added {reminder_type}: {message} (triggers in {reminder.time_until()})")
         return reminder
     
     def add_relative(self, message: str, minutes: int = 0, 
                      hours: int = 0, seconds: int = 0,
                      reminder_type: str = "reminder") -> Reminder:
+        """Add reminder with relative time (e.g., in 5 minutes)"""
         trigger_time = datetime.datetime.now() + datetime.timedelta(
             hours=hours, minutes=minutes, seconds=seconds
         )
@@ -173,9 +182,11 @@ class ReminderManager:
     
     def add_at_time(self, message: str, hour: int, minute: int = 0,
                     reminder_type: str = "reminder", recurring: bool = False) -> Reminder:
+        """Add reminder at specific time (e.g., at 5:30 PM)"""
         now = datetime.datetime.now()
         trigger_time = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
         
+        # If time has passed today, schedule for tomorrow
         if trigger_time <= now:
             trigger_time += datetime.timedelta(days=1)
         
@@ -183,103 +194,137 @@ class ReminderManager:
         return self.add(message, trigger_time, reminder_type, recurring, recurring_time)
     
     def set_timer(self, minutes: int, seconds: int = 0, message: str = None) -> Reminder:
+        """Set a countdown timer"""
         if message is None:
-            if minutes > 0:
+            if minutes > 0 and seconds > 0:
+                message = f"Timer: {minutes}m {seconds}s"
+            elif minutes > 0:
                 message = f"Timer: {minutes} minute{'s' if minutes != 1 else ''}"
             else:
-                message = f"Timer: {seconds} seconds"
+                message = f"Timer: {seconds} second{'s' if seconds != 1 else ''}"
+        
+        print(f"  ⏱️ Setting timer for {minutes}m {seconds}s")
         return self.add_relative(message, minutes=minutes, seconds=seconds, reminder_type="timer")
     
     def set_alarm(self, hour: int, minute: int = 0, recurring: bool = False) -> Reminder:
+        """Set an alarm at specific time"""
         message = f"Alarm: {hour:02d}:{minute:02d}"
         return self.add_at_time(message, hour, minute, "alarm", recurring)
     
     def get_all(self) -> List[Reminder]:
+        """Get all active reminders"""
         return [r for r in self.reminders if r.status == "active"]
     
     def get_by_id(self, reminder_id: str) -> Optional[Reminder]:
+        """Get reminder by ID"""
         for r in self.reminders:
             if r.id == reminder_id:
                 return r
         return None
     
     def delete(self, reminder_id: str) -> bool:
+        """Delete a reminder by ID"""
         for i, r in enumerate(self.reminders):
             if r.id == reminder_id:
                 self.reminders.pop(i)
                 self._save()
+                print(f"  🗑️ Deleted reminder: {r.message}")
                 return True
         return False
     
     def delete_by_index(self, index: int) -> bool:
+        """Delete reminder by index (1-based)"""
         active = self.get_all()
         if 1 <= index <= len(active):
             return self.delete(active[index - 1].id)
         return False
     
     def clear_all(self) -> int:
+        """Clear all reminders"""
         count = len(self.reminders)
         self.reminders = []
         self._save()
+        print(f"  🗑️ Cleared {count} reminders")
         return count
     
     def snooze(self, reminder_id: str, minutes: int = 5) -> bool:
+        """Snooze a reminder"""
         reminder = self.get_by_id(reminder_id)
         if reminder:
             reminder.trigger_time = datetime.datetime.now() + datetime.timedelta(minutes=minutes)
             reminder.status = "active"
             self._save()
+            print(f"  😴 Snoozed reminder for {minutes} minutes")
             return True
         return False
     
     def start(self):
+        """Start background checking thread"""
         if self._running:
+            print("  ⚠️ Reminder checker already running")
             return
+        
         self._running = True
         self._thread = threading.Thread(target=self._check_loop, daemon=True)
         self._thread.start()
+        print("  🚀 Reminder checker started")
     
     def stop(self):
+        """Stop background checking"""
         self._running = False
         if self._thread:
             self._thread.join(timeout=2)
+        print("  🛑 Reminder checker stopped")
     
     def _check_loop(self):
+        """Background loop that checks for due reminders"""
+        print("  🔄 Reminder check loop running...")
         while self._running:
-            self._check_reminders()
-            time.sleep(1)
+            try:
+                self._check_reminders()
+                time.sleep(1)  # Check every second
+            except Exception as e:
+                print(f"  ⚠️ Error in reminder check loop: {e}")
+                time.sleep(5)
     
     def _check_reminders(self):
-        for reminder in self.reminders:
+        """Check if any reminders are due"""
+        for reminder in self.reminders[:]:  # Copy list to allow modification
             if reminder.status == "active" and reminder.is_due():
                 self._trigger(reminder)
     
     def _trigger(self, reminder: Reminder):
-        print(f"  🔔 {reminder.message}")
+        """Trigger a reminder"""
+        print(f"  🔔 TRIGGERED: {reminder.message}")
         reminder.status = "triggered"
         self.triggered_queue.append(reminder)
         
+        # Handle recurring reminders
         if reminder.recurring and reminder.recurring_time:
             hour, minute = map(int, reminder.recurring_time.split(':'))
             next_time = datetime.datetime.now().replace(
-                hour=hour, minute=minute, second=0
+                hour=hour, minute=minute, second=0, microsecond=0
             ) + datetime.timedelta(days=1)
+            print(f"  🔁 Scheduling recurring reminder for tomorrow")
             self.add(reminder.message, next_time, reminder.reminder_type, True, reminder.recurring_time)
         
+        # Call callback if set
         if self.on_trigger:
             try:
                 self.on_trigger(reminder)
-            except:
-                pass
+            except Exception as e:
+                print(f"  ⚠️ Error in trigger callback: {e}")
         
         self._save()
     
     def get_triggered(self) -> List[Reminder]:
+        """Get and clear triggered reminders queue"""
         triggered = self.triggered_queue.copy()
         self.triggered_queue = []
         return triggered
     
     def format_list(self) -> str:
+        """Format all reminders as text"""
         active = sorted(self.get_all(), key=lambda r: r.trigger_time)
         
         if not active:
@@ -309,6 +354,7 @@ class TimeParser:
     
     @staticmethod
     def parse_relative(text: str) -> Optional[Dict]:
+        """Parse relative time expressions like '5 minutes', '2 hours 30 minutes'"""
         text = text.lower()
         result = {}
         
@@ -335,6 +381,7 @@ class TimeParser:
     
     @staticmethod
     def parse_absolute(text: str) -> Optional[Dict]:
+        """Parse absolute time expressions like '5pm', '14:30'"""
         text = text.lower()
         
         # 12-hour: "5pm", "5:30pm", "5 pm"
@@ -378,6 +425,7 @@ class TimeParser:
     
     @staticmethod
     def extract_message(text: str) -> str:
+        """Extract reminder message from command text"""
         # Remove command prefixes
         prefixes = [
             r'^remind\s+me\s+(?:to\s+)?',
@@ -404,16 +452,26 @@ class TimeParser:
         return message.strip() or "Reminder"
 
 
-# Global instance
+# =====================================================
+# GLOBAL INSTANCE
+# =====================================================
+
 _manager: Optional[ReminderManager] = None
 
 def get_reminder_manager() -> ReminderManager:
+    """Get or create global reminder manager instance"""
     global _manager
     if _manager is None:
+        print("  🚀 Creating reminder manager...")
         _manager = ReminderManager()
-        _manager.start()
+        _manager.start()  # CRITICAL: Start background checking
+        print("  ✅ Reminder manager ready")
     return _manager
 
+
+# =====================================================
+# COMMAND PROCESSING
+# =====================================================
 
 def process_reminder_command(command: str) -> tuple:
     """Process reminder command. Returns (success, response)."""
@@ -503,12 +561,17 @@ def process_reminder_command(command: str) -> tuple:
     return False, None
 
 
+# =====================================================
+# TEST
+# =====================================================
+
 if __name__ == "__main__":
     print("\n🔔 Testing Reminder System\n")
     
     tests = [
-        "remind me to take a break in 30 minutes",
         "set timer for 5 minutes",
+        "set timer for 10 seconds",
+        "remind me to take a break in 30 minutes",
         "set alarm for 7am",
         "show my reminders",
     ]
@@ -517,3 +580,13 @@ if __name__ == "__main__":
         success, response = process_reminder_command(cmd)
         print(f"'{cmd}'")
         print(f"  → {response}\n")
+    
+    print("Waiting 15 seconds to see if 10-second timer triggers...")
+    time.sleep(15)
+    
+    manager = get_reminder_manager()
+    triggered = manager.get_triggered()
+    if triggered:
+        print(f"✅ Got triggered reminders: {[r.message for r in triggered]}")
+    else:
+        print("❌ No triggered reminders")
