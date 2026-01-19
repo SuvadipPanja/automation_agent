@@ -929,12 +929,28 @@ Say "Hey ARES" followed by your command, or disable wake word in settings to res
                     </div>
                 </div>
                 
-                <!-- Quick Actions -->
+                <!-- Quick Actions - Row 1: Info -->
                 <div class="quick-actions">
-                    <button class="quick-btn" onclick="sendQuickCommand('What can you do?')">💡 Capabilities</button>
+                    <button class="quick-btn" onclick="sendQuickCommand('What can you do?')">💡 Help</button>
                     <button class="quick-btn" onclick="sendQuickCommand('What time is it?')">🕐 Time</button>
-                    <button class="quick-btn" onclick="sendQuickCommand('Tell me a joke')">😄 Joke</button>
-                    <button class="quick-btn" onclick="checkHealth()">❤️ Health</button>
+                    <button class="quick-btn" onclick="sendQuickCommand('battery status')">🔋 Battery</button>
+                    <button class="quick-btn" onclick="sendQuickCommand('system status')">📊 Status</button>
+                </div>
+                
+                <!-- Quick Actions - Row 2: Desktop Control -->
+                <div class="quick-actions">
+                    <button class="quick-btn" onclick="sendQuickCommand('open chrome')">🌐 Chrome</button>
+                    <button class="quick-btn" onclick="sendQuickCommand('open notepad')">📝 Notepad</button>
+                    <button class="quick-btn" onclick="sendQuickCommand('open file explorer')">📁 Files</button>
+                    <button class="quick-btn" onclick="sendQuickCommand('take screenshot')">📸 Screenshot</button>
+                </div>
+                
+                <!-- Quick Actions - Row 3: System Control -->
+                <div class="quick-actions">
+                    <button class="quick-btn" onclick="sendQuickCommand('volume up')">🔊 Vol+</button>
+                    <button class="quick-btn" onclick="sendQuickCommand('volume down')">🔉 Vol-</button>
+                    <button class="quick-btn" onclick="sendQuickCommand('mute')">🔇 Mute</button>
+                    <button class="quick-btn" onclick="sendQuickCommand('minimize all windows')">🪟 Desktop</button>
                 </div>
             </div>
         </div>
