@@ -51,15 +51,16 @@ except Exception as e:
     brain = None
     print(f"? AI Brain not available: {e}")
 
-# Desktop Controller
+# Desktop Controller - FIXED IMPORT
 try:
-    from desktop import handle_command as desktop_handle
-    from desktop import desktop
+    from automation import execute_command as desktop_execute
+    from automation.desktop_control import desktop
     DESKTOP_OK = True
     print("? Desktop automation loaded")
 except Exception as e:
     DESKTOP_OK = False
     desktop = None
+    desktop_execute = None
     print(f"? Desktop automation not available: {e}")
 
 # Whisper Voice Recognition
@@ -78,10 +79,32 @@ try:
     from automation.reminders import get_reminder_manager
     reminder_manager = get_reminder_manager()
     REMINDERS_OK = True
+    print("? Reminders loaded")
 except Exception as e:
     reminder_manager = None
     REMINDERS_OK = False
     print(f"? Reminders not available: {e}")
+
+
+# ===========================================
+# STARTUP BANNER FUNCTION
+# ===========================================
+
+def print_startup():
+    """Print startup banner with component status"""
+    print("\n" + "=" * 60)
+    print("   ?? ARES - Autonomous Runtime AI Agent")
+    print("=" * 60)
+    print(f"   AI Brain:    {'?' if brain else '?'}")
+    print(f"   Desktop:     {'?' if DESKTOP_OK else '?'}")
+    print(f"   Whisper:     {'?' if WHISPER_OK else '?'}")
+    print(f"   Reminders:   {'?' if REMINDERS_OK else '?'}")
+    print("=" * 60)
+    print("   Modern UI: http://127.0.0.1:5000/")
+    print("   Classic UI: http://127.0.0.1:5000/classic")
+    print("   Memory: http://127.0.0.1:5000/memory")
+    print("   Voice Test: http://127.0.0.1:5000/voice/test")
+    print("=" * 60 + "\n")
 
 
 # ===========================================
@@ -90,8 +113,20 @@ except Exception as e:
 
 @app.route("/")
 def index():
-    """Main ARES UI."""
+    """Main ARES UI - Modern JARVIS-style"""
+    return render_template("index_modern.html")
+
+
+@app.route("/classic")
+def classic():
+    """Classic ARES UI"""
     return render_template("index.html")
+
+
+@app.route("/memory")
+def memory_page():
+    """Memory/Profile management page"""
+    return render_template("memory.html")
 
 
 @app.route("/health")
@@ -110,11 +145,27 @@ def health():
     })
 
 
+@app.route("/status")
+def status():
+    """Enhanced status endpoint"""
+    return jsonify({
+        "agent": "ARES",
+        "status": "ONLINE",
+        "version": "2.0",
+        "time": datetime.datetime.now().isoformat(),
+        "features": {
+            "ai_brain": brain is not None,
+            "desktop_automation": DESKTOP_OK,
+            "whisper_available": WHISPER_OK,
+            "reminders": REMINDERS_OK
+        }
+    })
+
+
 @app.route("/tasks")
 def tasks():
     """Available tasks."""
     return jsonify([
-        {"name": "TEST_TASK"},
         {"name": "DESKTOP_CONTROL"},
         {"name": "VOICE_COMMAND"},
         {"name": "AI_CONVERSATION"},
@@ -222,7 +273,7 @@ def clear_reminders():
 def ai_command():
     """
     Main command endpoint.
-    Handles all commands - desktop, conversation, etc.
+    Handles all commands - desktop, conversation, reminders, etc.
     """
     try:
         data = request.get_json(silent=True)
@@ -240,22 +291,27 @@ def ai_command():
         # ===========================================
         # TRY DESKTOP AUTOMATION FIRST
         # ===========================================
-        if DESKTOP_OK:
-            result = desktop_handle(user_input)
-            
-            # If desktop handled it successfully
-            if result.get("success") or result.get("action") not in ["unknown", "conversation", None]:
-                return jsonify({
-                    "reply": result.get("response", "Done."),
-                    "action": result.get("action"),
-                    "data": result.get("data"),
-                    "source": "desktop"
-                })
+        if DESKTOP_OK and desktop_execute:
+            try:
+                success, response = desktop_execute(user_input)
+                
+                # If desktop handled it successfully
+                if success:
+                    return jsonify({
+                        "reply": response,
+                        "response": response,
+                        "speech": response,
+                        "action": "desktop",
+                        "success": True,
+                        "source": "desktop"
+                    })
+            except Exception as e:
+                print(f"Desktop execution error: {e}")
         
         # ===========================================
         # FAST GREETINGS (No AI needed)
         # ===========================================
-        if text in ["hi", "hello", "hey", "hii"]:
+        if text in ["hi", "hello", "hey", "hii", "hello there"]:
             hour = datetime.datetime.now().hour
             if hour < 12:
                 greet = "Good morning"
@@ -264,9 +320,11 @@ def ai_command():
             else:
                 greet = "Good evening"
             
-            reply = f"{greet}, Shobutik! I'm ARES. How can I help you?"
+            reply = f"{greet}! I'm ARES. How can I help you?"
             return jsonify({
                 "reply": reply,
+                "response": reply,
+                "speech": reply,
                 "source": "fast"
             })
         
@@ -279,6 +337,8 @@ def ai_command():
                 if response:
                     return jsonify({
                         "reply": response,
+                        "response": response,
+                        "speech": response,
                         "source": "ai"
                     })
             except Exception as e:
@@ -288,72 +348,15 @@ def ai_command():
         # FALLBACK
         # ===========================================
         return jsonify({
-            "reply": f"I heard: '{user_input}'. Try asking for 'help' to see what I can do.",
+            "reply": f"I heard: '{user_input}'. Try asking 'help' to see what I can do.",
+            "response": f"Command received: {user_input}",
+            "speech": "I'm not sure how to help with that.",
             "source": "fallback"
         })
     
     except Exception as e:
         print(f"? Error in /ai-command: {e}")
         traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
-
-
-# ===========================================
-# DESKTOP AUTOMATION ROUTES
-# ===========================================
-
-@app.route("/desktop/status")
-def desktop_status():
-    """Desktop automation status."""
-    if DESKTOP_OK and desktop:
-        return jsonify(desktop.get_status())
-    return jsonify({"available": False})
-
-
-@app.route("/desktop/action", methods=["POST"])
-def desktop_action():
-    """Execute a specific desktop action."""
-    if not DESKTOP_OK:
-        return jsonify({"error": "Desktop automation not available"}), 503
-    
-    try:
-        data = request.get_json()
-        action = data.get("action")
-        params = data.get("params", {})
-        
-        # Map actions to methods
-        actions = {
-            "open_app": lambda: desktop.open_app(params.get("app", "")),
-            "close_app": lambda: desktop.close_app(params.get("app", "")),
-            "open_folder": lambda: desktop.open_folder(params.get("folder", "")),
-            "search_google": lambda: desktop.search_google(params.get("query", "")),
-            "search_youtube": lambda: desktop.search_youtube(params.get("query", "")),
-            "open_website": lambda: desktop.open_website(params.get("url", "")),
-            "screenshot": lambda: desktop.take_screenshot(),
-            "volume_up": lambda: desktop.volume_up(),
-            "volume_down": lambda: desktop.volume_down(),
-            "mute": lambda: desktop.mute(),
-            "play_pause": lambda: desktop.play_pause(),
-            "next_track": lambda: desktop.next_track(),
-            "previous_track": lambda: desktop.previous_track(),
-            "minimize_all": lambda: desktop.minimize_all(),
-            "lock": lambda: desktop.lock_computer(),
-            "time": lambda: (True, f"The time is {desktop.get_time()}"),
-            "date": lambda: (True, f"Today is {desktop.get_date()}"),
-            "battery": lambda: (True, desktop.get_battery()),
-        }
-        
-        if action not in actions:
-            return jsonify({"error": f"Unknown action: {action}"}), 400
-        
-        success, response = actions[action]()
-        return jsonify({
-            "success": success,
-            "response": response,
-            "action": action
-        })
-    
-    except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
@@ -439,23 +442,85 @@ def voice_transcribe():
 
 
 # ===========================================
-# SYSTEM INFO ROUTES
+# MEMORY ROUTES
 # ===========================================
 
-@app.route("/system/info")
-def system_info():
-    """Get system information."""
-    if DESKTOP_OK and desktop:
-        return jsonify(desktop.get_system_info())
-    return jsonify({"error": "Desktop not available"}), 503
+@app.route("/memory/profile")
+def memory_profile():
+    """Get user profile and memory info"""
+    if not brain:
+        return jsonify({"error": "AI Brain not available"}), 503
+    
+    try:
+        profile_data = brain.profile.get_full_profile()
+        memory_export = brain.memory.export_memory()
+        
+        return jsonify({
+            "profile": profile_data.get("user", {}),
+            "preferences": memory_export.get("preferences", {}),
+            "facts": memory_export.get("facts", [])
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
-@app.route("/system/apps")
-def running_apps():
-    """Get running applications."""
-    if DESKTOP_OK and desktop:
-        return jsonify({"apps": desktop.list_running_apps()})
-    return jsonify({"error": "Desktop not available"}), 503
+@app.route("/memory/conversations")
+def memory_conversations():
+    """Get conversation history"""
+    if not brain:
+        return jsonify({"error": "AI Brain not available"}), 503
+    
+    try:
+        limit = int(request.args.get("limit", 10))
+        conversations = brain.memory.get_recent_conversations(limit)
+        return jsonify({"conversations": conversations})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/memory/clear-conversations", methods=["POST"])
+def memory_clear_conversations():
+    """Clear conversation history"""
+    if not brain:
+        return jsonify({"error": "AI Brain not available"}), 503
+    
+    try:
+        brain.memory.clear_conversations()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/memory/clear-all", methods=["POST"])
+def memory_clear_all():
+    """Clear ALL memory"""
+    if not brain:
+        return jsonify({"error": "AI Brain not available"}), 503
+    
+    try:
+        brain.memory.clear_all_memory()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/memory/export")
+def memory_export():
+    """Export all memory"""
+    if not brain:
+        return jsonify({"error": "AI Brain not available"}), 503
+    
+    try:
+        memory_data = brain.memory.export_memory()
+        profile_data = brain.profile.get_full_profile()
+        
+        return jsonify({
+            "memory": memory_data,
+            "profile": profile_data,
+            "exported_at": datetime.datetime.now().isoformat()
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 # ===========================================
@@ -473,14 +538,5 @@ def serve_static(filename):
 # ===========================================
 
 if __name__ == "__main__":
-    print("\n" + "=" * 50)
-    print("   ARES - Autonomous Runtime AI Agent")
-    print("=" * 50)
-    print(f"   AI Brain:    {'?' if brain else '?'}")
-    print(f"   Desktop:     {'?' if DESKTOP_OK else '?'}")
-    print(f"   Whisper:     {'?' if WHISPER_OK else '?'}")
-    print("=" * 50)
-    print("   Open: http://127.0.0.1:5000")
-    print("=" * 50 + "\n")
-    
+    print_startup()
     app.run(host="127.0.0.1", port=5000, debug=True)
