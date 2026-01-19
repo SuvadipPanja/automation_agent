@@ -1,401 +1,228 @@
 """
 =====================================================
-ARES - AUTONOMOUS RUNTIME AI AGENT
+ARES WEB APPLICATION - INTEGRATED
 =====================================================
-UNIFIED WEB APPLICATION - EVERYTHING IN ONE PLACE!
-
-Just run: python main_web.py
-Open: http://127.0.0.1:5000
+Main Flask application for ARES.
 
 Features:
-? Web UI (JARVIS-style)
-? Voice Recognition (Whisper)
+? Web UI (JARVIS-style interface)
 ? AI Brain (Ollama/Llama3)
 ? Desktop Automation
-? Text-to-Speech
+? Whisper Voice Recognition
+? Text-to-Speech (via browser)
+
+All accessible from ONE entry point: main_web.py
 
 Author: ARES AI Assistant
 For: Shobutik Panja
 =====================================================
 """
 
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_from_directory
 from pathlib import Path
 import datetime
 import traceback
-import sys
-import os
 import base64
 import tempfile
+import os
 
-# -------------------------------
-# PATH SETUP
-# -------------------------------
+# ===========================================
+# APP SETUP
+# ===========================================
+
 BASE_DIR = Path(__file__).resolve().parent
-PROJECT_ROOT = BASE_DIR.parent
-sys.path.insert(0, str(PROJECT_ROOT))
 
-# -------------------------------
-# FLASK APP
-# -------------------------------
 app = Flask(
     __name__,
     template_folder=str(BASE_DIR / "templates"),
     static_folder=str(BASE_DIR / "static")
 )
 
-print()
-print("=" * 60)
-print("  ?? ARES - Autonomous Runtime AI Agent")
-print("=" * 60)
-print()
-
-# =====================================================
+# ===========================================
 # COMPONENT LOADING
-# =====================================================
+# ===========================================
 
-# --- AI BRAIN ---
-brain = None
+# AI Brain
 try:
     from ai.brain import AIBrain
     brain = AIBrain()
-    print("  ? AI Brain loaded (Ollama/Llama3)")
+    print("? AI Brain loaded")
 except Exception as e:
-    print(f"  ??  AI Brain not available: {e}")
+    brain = None
+    print(f"? AI Brain not available: {e}")
 
-# --- WHISPER (Speech Recognition) ---
-whisper_model = None
-WHISPER_AVAILABLE = False
+# Desktop Controller
+try:
+    from desktop import handle_command as desktop_handle
+    from desktop import desktop
+    DESKTOP_OK = True
+    print("? Desktop automation loaded")
+except Exception as e:
+    DESKTOP_OK = False
+    desktop = None
+    print(f"? Desktop automation not available: {e}")
 
+# Whisper Voice Recognition
 try:
     from faster_whisper import WhisperModel
-    WHISPER_AVAILABLE = True
-    print("  ? Whisper available (loads on first use)")
-except ImportError:
-    print("  ??  Whisper not installed: pip install faster-whisper")
-
-def get_whisper():
-    """Lazy load Whisper model on first use."""
-    global whisper_model
-    if whisper_model is None and WHISPER_AVAILABLE:
-        print("  ?? Loading Whisper model (first time)...")
-        try:
-            whisper_model = WhisperModel("base", device="cpu", compute_type="int8")
-            print("  ? Whisper model loaded!")
-        except Exception as e:
-            print(f"  ? Whisper failed: {e}")
-    return whisper_model
-
-# --- DESKTOP AUTOMATION ---
-desktop = None
-command_parser = None
-CommandType = None
-CommandExecutor = None
-DESKTOP_AVAILABLE = False
-
-try:
-    import pyautogui
-    import psutil
-    pyautogui.FAILSAFE = True
-    pyautogui.PAUSE = 0.1
-    DESKTOP_AVAILABLE = True
-    print("  ? Desktop automation available (pyautogui)")
-except ImportError:
-    print("  ??  Desktop not installed: pip install pyautogui psutil")
-
-try:
-    from automation.desktop_control import DesktopAutomation
-    from automation.command_parser import CommandParser, CommandExecutor as CmdExec, CommandType as CmdType
-    desktop = DesktopAutomation()
-    command_parser = CommandParser()
-    CommandType = CmdType
-    CommandExecutor = CmdExec
-    print("  ? Desktop automation modules loaded")
+    whisper_model = WhisperModel("base", device="cpu", compute_type="int8")
+    WHISPER_OK = True
+    print("? Whisper loaded")
 except Exception as e:
-    print(f"  ??  Desktop modules not found: {e}")
+    whisper_model = None
+    WHISPER_OK = False
+    print(f"? Whisper not available: {e}")
 
-print()
-print("=" * 60)
+# Reminder System
+try:
+    from automation.reminders import get_reminder_manager
+    reminder_manager = get_reminder_manager()
+    REMINDERS_OK = True
+except Exception as e:
+    reminder_manager = None
+    REMINDERS_OK = False
+    print(f"? Reminders not available: {e}")
 
-# =====================================================
-# PAGE ROUTES
-# =====================================================
+
+# ===========================================
+# BASIC ROUTES
+# ===========================================
 
 @app.route("/")
 def index():
-    """Main JARVIS-style UI"""
-    return render_template("index_modern.html")
+    """Main ARES UI."""
+    return render_template("index.html")
 
-@app.route("/classic")
-def classic():
-    """Classic minimal UI"""
-    try:
-        return render_template("index.html")
-    except:
-        return render_template("index_modern.html")
-
-@app.route("/voicetest")
-def voice_test():
-    """Voice test page"""
-    try:
-        return render_template("voice_test.html")
-    except:
-        return "<h1>Voice Test</h1><p>Test page not available</p>"
-
-@app.route("/memory")
-def memory_page():
-    """Memory management page"""
-    try:
-        return render_template("memory.html")
-    except:
-        return "<h1>Memory</h1><p>Memory page not available</p>"
-
-# =====================================================
-# SYSTEM STATUS
-# =====================================================
 
 @app.route("/health")
 def health():
-    """Quick health check."""
+    """System health check."""
     return jsonify({
         "agent": "ARES",
         "status": "ONLINE",
-        "time": datetime.datetime.now().isoformat()
+        "time": datetime.datetime.now().isoformat(),
+        "components": {
+            "ai_brain": brain is not None,
+            "desktop": DESKTOP_OK,
+            "whisper": WHISPER_OK,
+            "reminders": REMINDERS_OK
+        }
     })
 
-@app.route("/status")
-def status():
-    """Detailed system status."""
-    user_name = "Unknown"
-    try:
-        user_name = os.getlogin() if os.name == 'nt' else os.environ.get('USER', 'user')
-    except:
-        pass
-    
-    status_info = {
-        "agent": "ARES",
-        "version": "2.0",
-        "status": "ONLINE",
-        "time": datetime.datetime.now().isoformat(),
-        "user": user_name,
-        "features": {
-            "ai_brain": brain is not None,
-            "whisper_available": WHISPER_AVAILABLE,
-            "whisper_loaded": whisper_model is not None,
-            "desktop_automation": DESKTOP_AVAILABLE,
-            "desktop_loaded": desktop is not None
-        }
-    }
-    
-    # Add system info
-    if desktop:
-        try:
-            status_info["system"] = desktop.get_system_info()
-            status_info["battery"] = desktop.get_battery_status()
-        except:
-            pass
-    
-    return jsonify(status_info)
 
 @app.route("/tasks")
 def tasks():
+    """Available tasks."""
     return jsonify([
         {"name": "TEST_TASK"},
         {"name": "DESKTOP_CONTROL"},
-        {"name": "VOICE_ASSISTANT"}
+        {"name": "VOICE_COMMAND"},
+        {"name": "AI_CONVERSATION"},
+        {"name": "REMINDERS"}
     ])
+
 
 @app.route("/schedules")
 def schedules():
-    return jsonify([
-        {"enabled": True, "task": "TEST_TASK", "time": "11:15", "type": "daily"}
-    ])
+    """Scheduled tasks."""
+    return jsonify([])
+
 
 @app.route("/reload-schedules", methods=["POST"])
 def reload_schedules():
-    return jsonify({"status": "Schedules reloaded"})
+    """Reload schedules."""
+    return jsonify({"status": "OK"})
 
-# =====================================================
-# VOICE ROUTES (Whisper Transcription)
-# =====================================================
 
-@app.route("/voice/status")
-def voice_status():
-    """Check voice system status."""
+# ===========================================
+# REMINDER API ROUTES
+# ===========================================
+
+@app.route("/reminders")
+def get_reminders():
+    """Get all active reminders."""
+    if not REMINDERS_OK or not reminder_manager:
+        return jsonify({"error": "Reminder system not available"}), 503
+    
+    reminders = reminder_manager.get_all()
     return jsonify({
-        "whisper_available": WHISPER_AVAILABLE,
-        "whisper_loaded": whisper_model is not None,
-        "model": "base" if WHISPER_AVAILABLE else None
+        "reminders": [r.to_dict() for r in reminders],
+        "count": len(reminders)
     })
 
-@app.route("/voice/transcribe", methods=["POST"])
-def voice_transcribe():
-    """Transcribe audio using Whisper."""
-    if not WHISPER_AVAILABLE:
-        return jsonify({
-            "error": "Whisper not installed",
-            "hint": "Run: pip install faster-whisper"
-        }), 503
-    
-    # Get Whisper model
-    whisper = get_whisper()
-    if not whisper:
-        return jsonify({"error": "Failed to load Whisper model"}), 500
-    
-    language = request.args.get("language", "en")
-    
-    try:
-        audio_data = None
-        
-        # Check for file upload
-        if 'audio' in request.files:
-            audio_file = request.files['audio']
-            audio_data = audio_file.read()
-        
-        # Check for base64 audio
-        elif request.is_json:
-            data = request.get_json()
-            if data and 'audio' in data:
-                audio_b64 = data['audio']
-                if ',' in audio_b64:
-                    audio_b64 = audio_b64.split(',')[1]
-                audio_data = base64.b64decode(audio_b64)
-        
-        # Check for raw bytes
-        elif request.data:
-            audio_data = request.data
-        
-        if not audio_data:
-            return jsonify({"error": "No audio data provided"}), 400
-        
-        # Save to temp file
-        with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as f:
-            f.write(audio_data)
-            temp_path = f.name
-        
-        try:
-            # Transcribe
-            segments, info = whisper.transcribe(
-                temp_path,
-                language=language,
-                beam_size=5,
-                vad_filter=True
-            )
-            
-            text = " ".join([seg.text for seg in segments]).strip()
-            
-            return jsonify({
-                "text": text,
-                "language": info.language,
-                "duration": info.duration
-            })
-            
-        finally:
-            # Clean up
-            try:
-                os.unlink(temp_path)
-            except:
-                pass
-    
-    except Exception as e:
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
 
-# =====================================================
-# DESKTOP AUTOMATION ROUTES
-# =====================================================
+@app.route("/reminders/triggered")
+def get_triggered_reminders():
+    """Get triggered reminders (for notifications)."""
+    if not REMINDERS_OK or not reminder_manager:
+        return jsonify({"triggered": []})
+    
+    triggered = reminder_manager.get_triggered()
+    return jsonify({
+        "triggered": [r.to_dict() for r in triggered]
+    })
 
-@app.route("/desktop/execute", methods=["POST"])
-def desktop_execute():
-    """Execute a desktop command directly."""
-    if not DESKTOP_AVAILABLE or not desktop:
-        return jsonify({
-            "success": False,
-            "error": "Desktop automation not available"
-        }), 503
+
+@app.route("/reminders/add", methods=["POST"])
+def add_reminder():
+    """Add a new reminder via API."""
+    if not REMINDERS_OK or not reminder_manager:
+        return jsonify({"error": "Reminder system not available"}), 503
     
     data = request.get_json(silent=True)
-    if not data or "command" not in data:
-        return jsonify({"success": False, "error": "No command"}), 400
+    if not data:
+        return jsonify({"error": "No data provided"}), 400
     
-    command = data["command"]
+    message = data.get("message", "Reminder")
+    minutes = data.get("minutes", 0)
+    hours = data.get("hours", 0)
+    seconds = data.get("seconds", 0)
     
     try:
-        if CommandExecutor:
-            executor = CommandExecutor()
-            success, response = executor.execute(command)
-        else:
-            success, response = False, "Parser not available"
-        
+        reminder = reminder_manager.add_relative(
+            message=message,
+            minutes=minutes,
+            hours=hours,
+            seconds=seconds
+        )
         return jsonify({
-            "success": success,
-            "response": response
+            "success": True,
+            "reminder": reminder.to_dict()
         })
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+        return jsonify({"error": str(e)}), 500
 
-@app.route("/desktop/info")
-def desktop_info():
-    """Get system information."""
-    if not desktop:
-        return jsonify({"error": "Desktop not available"}), 503
-    
-    return jsonify({
-        "time": desktop.get_time(),
-        "date": desktop.get_date(),
-        "battery": desktop.get_battery_status(),
-        "system": desktop.get_system_info()
-    })
 
-# =====================================================
-# MEMORY ROUTES
-# =====================================================
+@app.route("/reminders/delete/<reminder_id>", methods=["DELETE"])
+def delete_reminder(reminder_id):
+    """Delete a reminder."""
+    if not REMINDERS_OK or not reminder_manager:
+        return jsonify({"error": "Reminder system not available"}), 503
+    
+    if reminder_manager.delete(reminder_id):
+        return jsonify({"success": True})
+    return jsonify({"error": "Reminder not found"}), 404
 
-@app.route("/memory/profile", methods=["GET"])
-def get_memory_profile():
-    if not brain or not hasattr(brain, 'memory') or not brain.memory:
-        return jsonify({"error": "Memory not available"}), 500
-    
-    return jsonify({
-        "profile": brain.memory.get_full_profile(),
-        "preferences": brain.memory.get_preferences(),
-        "facts": brain.memory.get_facts(limit=10)
-    })
 
-@app.route("/memory/set-info", methods=["POST"])
-def set_user_info():
-    if not brain or not hasattr(brain, 'memory') or not brain.memory:
-        return jsonify({"error": "Memory not available"}), 500
+@app.route("/reminders/clear", methods=["POST"])
+def clear_reminders():
+    """Clear all reminders."""
+    if not REMINDERS_OK or not reminder_manager:
+        return jsonify({"error": "Reminder system not available"}), 503
     
-    data = request.get_json(silent=True)
-    if not data or "key" not in data or "value" not in data:
-        return jsonify({"error": "Missing key or value"}), 400
-    
-    brain.memory.set_user_info(data["key"], data["value"])
-    
-    if data["key"] == "name":
-        brain.user_name = data["value"]
-    
-    return jsonify({"status": "Saved"})
+    count = reminder_manager.clear_all()
+    return jsonify({"success": True, "deleted": count})
 
-# =====================================================
+
+# ===========================================
 # MAIN AI COMMAND ENDPOINT
-# =====================================================
-# This is the UNIFIED endpoint that handles EVERYTHING:
-# - Desktop commands (open app, screenshot, etc.)
-# - Information queries (time, battery, etc.)
-# - Conversation (AI chat)
-# =====================================================
+# ===========================================
 
 @app.route("/ai-command", methods=["POST"])
 def ai_command():
     """
-    UNIFIED COMMAND ENDPOINT
-    
-    Handles ALL user commands:
-    1. Desktop automation (open, close, screenshot, etc.)
-    2. System queries (time, date, battery)
-    3. AI conversation
+    Main command endpoint.
+    Handles all commands - desktop, conversation, etc.
     """
     try:
         data = request.get_json(silent=True)
@@ -408,49 +235,27 @@ def ai_command():
         if not user_input:
             return jsonify({"error": "Empty command"}), 400
         
-        text_lower = user_input.lower()
+        text = user_input.lower()
         
-        # =========================================
-        # STEP 1: Check for Desktop Commands
-        # =========================================
-        if command_parser and desktop and CommandType and CommandExecutor:
-            parsed = command_parser.parse(user_input)
+        # ===========================================
+        # TRY DESKTOP AUTOMATION FIRST
+        # ===========================================
+        if DESKTOP_OK:
+            result = desktop_handle(user_input)
             
-            # List of desktop command types
-            desktop_commands = [
-                CommandType.OPEN_APP, CommandType.CLOSE_APP,
-                CommandType.SEARCH_GOOGLE, CommandType.SEARCH_YOUTUBE,
-                CommandType.OPEN_WEBSITE, CommandType.OPEN_FOLDER,
-                CommandType.TAKE_SCREENSHOT,
-                CommandType.MINIMIZE_WINDOW, CommandType.MAXIMIZE_WINDOW,
-                CommandType.CLOSE_WINDOW, CommandType.MINIMIZE_ALL, 
-                CommandType.SWITCH_WINDOW,
-                CommandType.LOCK_COMPUTER,
-                CommandType.VOLUME_UP, CommandType.VOLUME_DOWN, CommandType.MUTE,
-                CommandType.PLAY_PAUSE, CommandType.NEXT_TRACK, CommandType.PREVIOUS_TRACK,
-                CommandType.TYPE_TEXT, CommandType.COPY, CommandType.PASTE,
-                CommandType.SAVE, CommandType.UNDO, CommandType.REDO, CommandType.SELECT_ALL,
-                CommandType.GET_TIME, CommandType.GET_DATE, CommandType.GET_BATTERY,
-                CommandType.GET_SYSTEM_INFO, CommandType.LIST_RUNNING_APPS,
-                CommandType.HELP
-            ]
-            
-            if parsed.command_type in desktop_commands:
-                # Execute desktop command
-                executor = CommandExecutor()
-                success, response = executor.execute(user_input)
-                
+            # If desktop handled it successfully
+            if result.get("success") or result.get("action") not in ["unknown", "conversation", None]:
                 return jsonify({
-                    "reply": response,
-                    "speech": response,
-                    "type": "desktop",
-                    "success": success
+                    "reply": result.get("response", "Done."),
+                    "action": result.get("action"),
+                    "data": result.get("data"),
+                    "source": "desktop"
                 })
         
-        # =========================================
-        # STEP 2: Fast Greetings
-        # =========================================
-        if text_lower in ["hi", "hello", "hey", "hii", "hola"]:
+        # ===========================================
+        # FAST GREETINGS (No AI needed)
+        # ===========================================
+        if text in ["hi", "hello", "hey", "hii"]:
             hour = datetime.datetime.now().hour
             if hour < 12:
                 greet = "Good morning"
@@ -459,133 +264,223 @@ def ai_command():
             else:
                 greet = "Good evening"
             
-            user_name = "Shobutik"
-            if brain and hasattr(brain, 'user_name') and brain.user_name:
-                user_name = brain.user_name
-            
-            reply = f"{greet}, {user_name}! I am ARES. How can I help you?"
+            reply = f"{greet}, Shobutik! I'm ARES. How can I help you?"
             return jsonify({
                 "reply": reply,
-                "speech": reply,
-                "type": "greeting"
+                "source": "fast"
             })
         
-        # Identity questions
-        if text_lower in ["who are you", "your name", "what are you"]:
-            features = []
-            if brain: features.append("AI conversation")
-            if DESKTOP_AVAILABLE: features.append("desktop control")
-            if WHISPER_AVAILABLE: features.append("voice recognition")
-            
-            reply = f"I am ARES - Autonomous Runtime AI Agent. I can help you with {', '.join(features)}!"
-            return jsonify({
-                "reply": reply,
-                "speech": reply,
-                "type": "introduction"
-            })
-        
-        # =========================================
-        # STEP 3: AI Brain for Conversation
-        # =========================================
+        # ===========================================
+        # AI BRAIN FOR CONVERSATION
+        # ===========================================
         if brain:
-            plan = brain.think(user_input)
-            
-            if isinstance(plan, dict):
-                intent = plan.get("intent", "UNKNOWN")
-                
-                # Pre-built reply
-                if intent == "CHAT" and plan.get("reply"):
+            try:
+                response = brain.converse(user_input)
+                if response:
                     return jsonify({
-                        "reply": plan.get("reply"),
-                        "speech": plan.get("reply"),
-                        "type": "chat"
+                        "reply": response,
+                        "source": "ai"
                     })
-                
-                # Status query
-                elif intent == "STATUS":
-                    reply = f"System Status:\n\n"
-                    reply += f" AI Brain: {'? Online' if brain else '? Offline'}\n"
-                    reply += f" Whisper: {'? Available' if WHISPER_AVAILABLE else '? Not installed'}\n"
-                    reply += f" Desktop: {'? Ready' if DESKTOP_AVAILABLE else '? Not installed'}\n"
-                    reply += f" Status: ONLINE"
-                    return jsonify({
-                        "reply": reply,
-                        "speech": "All systems operational.",
-                        "type": "status"
-                    })
-                
-                # Capabilities
-                elif intent == "CAPABILITIES":
-                    reply = "I can help you with:\n\n"
-                    reply += "??? Desktop Control - Open apps, screenshots, volume\n"
-                    reply += "?? Web Search - Google, YouTube\n"
-                    reply += "?? Files - Open folders\n"
-                    reply += "?? Conversation - Chat with me\n"
-                    reply += "?? Voice - Speak commands"
-                    return jsonify({
-                        "reply": reply,
-                        "speech": "I can control your desktop, search the web, and chat with you.",
-                        "type": "capabilities"
-                    })
-                
-                # General conversation
-                else:
-                    response_text = brain.converse(user_input)
-                    return jsonify({
-                        "reply": response_text,
-                        "speech": response_text,
-                        "type": "conversation"
-                    })
-            
-            # Plan is not dict, use conversation
-            else:
-                response_text = brain.converse(user_input)
-                return jsonify({
-                    "reply": response_text,
-                    "speech": response_text,
-                    "type": "conversation"
-                })
+            except Exception as e:
+                print(f"AI Brain error: {e}")
         
-        # =========================================
-        # STEP 4: Fallback (No AI Brain)
-        # =========================================
+        # ===========================================
+        # FALLBACK
+        # ===========================================
         return jsonify({
-            "reply": f"Received: {user_input}\n\nAI Brain not available. Make sure Ollama is running.",
-            "speech": "Command received, but AI is not available.",
-            "type": "fallback"
+            "reply": f"I heard: '{user_input}'. Try asking for 'help' to see what I can do.",
+            "source": "fallback"
         })
     
     except Exception as e:
-        print("?? Error in /ai-command:")
+        print(f"? Error in /ai-command: {e}")
         traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+# ===========================================
+# DESKTOP AUTOMATION ROUTES
+# ===========================================
+
+@app.route("/desktop/status")
+def desktop_status():
+    """Desktop automation status."""
+    if DESKTOP_OK and desktop:
+        return jsonify(desktop.get_status())
+    return jsonify({"available": False})
+
+
+@app.route("/desktop/action", methods=["POST"])
+def desktop_action():
+    """Execute a specific desktop action."""
+    if not DESKTOP_OK:
+        return jsonify({"error": "Desktop automation not available"}), 503
+    
+    try:
+        data = request.get_json()
+        action = data.get("action")
+        params = data.get("params", {})
+        
+        # Map actions to methods
+        actions = {
+            "open_app": lambda: desktop.open_app(params.get("app", "")),
+            "close_app": lambda: desktop.close_app(params.get("app", "")),
+            "open_folder": lambda: desktop.open_folder(params.get("folder", "")),
+            "search_google": lambda: desktop.search_google(params.get("query", "")),
+            "search_youtube": lambda: desktop.search_youtube(params.get("query", "")),
+            "open_website": lambda: desktop.open_website(params.get("url", "")),
+            "screenshot": lambda: desktop.take_screenshot(),
+            "volume_up": lambda: desktop.volume_up(),
+            "volume_down": lambda: desktop.volume_down(),
+            "mute": lambda: desktop.mute(),
+            "play_pause": lambda: desktop.play_pause(),
+            "next_track": lambda: desktop.next_track(),
+            "previous_track": lambda: desktop.previous_track(),
+            "minimize_all": lambda: desktop.minimize_all(),
+            "lock": lambda: desktop.lock_computer(),
+            "time": lambda: (True, f"The time is {desktop.get_time()}"),
+            "date": lambda: (True, f"Today is {desktop.get_date()}"),
+            "battery": lambda: (True, desktop.get_battery()),
+        }
+        
+        if action not in actions:
+            return jsonify({"error": f"Unknown action: {action}"}), 400
+        
+        success, response = actions[action]()
         return jsonify({
-            "error": str(e),
-            "reply": f"Error: {str(e)}",
-            "type": "error"
-        }), 500
+            "success": success,
+            "response": response,
+            "action": action
+        })
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
-# =====================================================
-# STARTUP
-# =====================================================
+# ===========================================
+# VOICE RECOGNITION ROUTES
+# ===========================================
 
-def print_startup():
-    print()
-    print("  ?? Open: http://127.0.0.1:5000")
-    print()
-    print("  Commands:")
-    print("     'Open Chrome'")
-    print("     'Search Google for Python'")
-    print("     'Take a screenshot'")
-    print("     'What time is it?'")
-    print("     'Volume up'")
-    print()
-    print("=" * 60)
-    print("  ?? ARES is ready!")
-    print("=" * 60)
-    print()
+@app.route("/voice/status")
+def voice_status():
+    """Voice recognition status."""
+    return jsonify({
+        "available": WHISPER_OK,
+        "model": "base" if WHISPER_OK else None
+    })
 
+
+@app.route("/voice/transcribe", methods=["POST"])
+def voice_transcribe():
+    """
+    Transcribe audio to text using Whisper.
+    Accepts: audio file, base64, or raw bytes.
+    """
+    if not WHISPER_OK:
+        return jsonify({"error": "Whisper not available"}), 503
+    
+    try:
+        temp_path = None
+        
+        # Handle different input formats
+        if request.files and 'audio' in request.files:
+            # File upload
+            audio_file = request.files['audio']
+            temp_path = tempfile.mktemp(suffix=".wav")
+            audio_file.save(temp_path)
+        
+        elif request.is_json:
+            data = request.get_json()
+            
+            if 'audio_base64' in data:
+                # Base64 encoded audio
+                audio_bytes = base64.b64decode(data['audio_base64'])
+                temp_path = tempfile.mktemp(suffix=".wav")
+                with open(temp_path, 'wb') as f:
+                    f.write(audio_bytes)
+        
+        else:
+            # Raw bytes
+            audio_bytes = request.data
+            if audio_bytes:
+                temp_path = tempfile.mktemp(suffix=".wav")
+                with open(temp_path, 'wb') as f:
+                    f.write(audio_bytes)
+        
+        if not temp_path or not os.path.exists(temp_path):
+            return jsonify({"error": "No audio data provided"}), 400
+        
+        # Transcribe with Whisper
+        segments, info = whisper_model.transcribe(
+            temp_path,
+            language="en",
+            beam_size=5,
+            vad_filter=True
+        )
+        
+        text = " ".join([seg.text for seg in segments]).strip()
+        
+        # Cleanup
+        if temp_path and os.path.exists(temp_path):
+            os.unlink(temp_path)
+        
+        return jsonify({
+            "success": True,
+            "text": text,
+            "language": info.language if info else "en"
+        })
+    
+    except Exception as e:
+        print(f"? Transcription error: {e}")
+        traceback.print_exc()
+        if temp_path and os.path.exists(temp_path):
+            os.unlink(temp_path)
+        return jsonify({"error": str(e)}), 500
+
+
+# ===========================================
+# SYSTEM INFO ROUTES
+# ===========================================
+
+@app.route("/system/info")
+def system_info():
+    """Get system information."""
+    if DESKTOP_OK and desktop:
+        return jsonify(desktop.get_system_info())
+    return jsonify({"error": "Desktop not available"}), 503
+
+
+@app.route("/system/apps")
+def running_apps():
+    """Get running applications."""
+    if DESKTOP_OK and desktop:
+        return jsonify({"apps": desktop.list_running_apps()})
+    return jsonify({"error": "Desktop not available"}), 503
+
+
+# ===========================================
+# STATIC FILES
+# ===========================================
+
+@app.route("/static/<path:filename>")
+def serve_static(filename):
+    """Serve static files."""
+    return send_from_directory(app.static_folder, filename)
+
+
+# ===========================================
+# MAIN
+# ===========================================
 
 if __name__ == "__main__":
-    print_startup()
+    print("\n" + "=" * 50)
+    print("   ARES - Autonomous Runtime AI Agent")
+    print("=" * 50)
+    print(f"   AI Brain:    {'?' if brain else '?'}")
+    print(f"   Desktop:     {'?' if DESKTOP_OK else '?'}")
+    print(f"   Whisper:     {'?' if WHISPER_OK else '?'}")
+    print("=" * 50)
+    print("   Open: http://127.0.0.1:5000")
+    print("=" * 50 + "\n")
+    
     app.run(host="127.0.0.1", port=5000, debug=True)

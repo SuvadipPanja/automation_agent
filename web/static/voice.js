@@ -45,6 +45,9 @@ document.addEventListener("DOMContentLoaded", function() {
     checkSystemStatus();
     loadVoices();
     
+    // Start reminder polling
+    setInterval(checkReminders, 2000);
+    
     // Space bar to toggle voice
     document.addEventListener('keydown', function(e) {
         if (e.code === 'Space' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
@@ -55,6 +58,78 @@ document.addEventListener("DOMContentLoaded", function() {
     
     console.log("✅ ARES Ready!");
 });
+
+// =====================================================
+// REMINDER POLLING
+// =====================================================
+function checkReminders() {
+    fetch("/reminders/triggered")
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.triggered && data.triggered.length > 0) {
+                data.triggered.forEach(function(reminder) {
+                    showReminderNotification(reminder);
+                });
+            }
+        })
+        .catch(function(e) {
+            // Silent fail - server might be busy
+        });
+}
+
+function showReminderNotification(reminder) {
+    var icon = reminder.reminder_type === "alarm" ? "⏰" : 
+               reminder.reminder_type === "timer" ? "⏱️" : "🔔";
+    
+    var message = icon + " " + reminder.message;
+    
+    // Show on screen
+    showResponse(message, "success");
+    
+    // Speak it
+    speak(reminder.message);
+    
+    // Play alarm sound for alarms/timers
+    if (reminder.reminder_type === "alarm" || reminder.reminder_type === "timer") {
+        playAlarmSound();
+    }
+    
+    // Browser notification
+    if ("Notification" in window && Notification.permission === "granted") {
+        new Notification("ARES " + icon, {
+            body: reminder.message,
+            icon: "/static/icon.png"
+        });
+    }
+}
+
+function playAlarmSound() {
+    // Play beeps for alarm
+    try {
+        var ctx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function beep(freq, startTime) {
+            var osc = ctx.createOscillator();
+            var gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.frequency.value = freq;
+            gain.gain.value = 0.3;
+            osc.start(startTime);
+            osc.stop(startTime + 0.2);
+        }
+        
+        // Play 3 beeps
+        beep(880, ctx.currentTime);
+        beep(880, ctx.currentTime + 0.3);
+        beep(880, ctx.currentTime + 0.6);
+    } catch (e) {}
+}
+
+// Request notification permission
+if ("Notification" in window && Notification.permission === "default") {
+    Notification.requestPermission();
+}
 
 // =====================================================
 // SYSTEM STATUS CHECK

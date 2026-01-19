@@ -84,6 +84,15 @@ class CommandType(Enum):
     GET_SYSTEM_INFO = "get_system_info"
     LIST_RUNNING_APPS = "list_running_apps"
     
+    # Reminders & Alarms
+    SET_REMINDER = "set_reminder"
+    SET_ALARM = "set_alarm"
+    SET_TIMER = "set_timer"
+    LIST_REMINDERS = "list_reminders"
+    DELETE_REMINDER = "delete_reminder"
+    DELETE_ALL_REMINDERS = "delete_all_reminders"
+    SNOOZE = "snooze"
+    
     # Conversation
     GREETING = "greeting"
     HELP = "help"
@@ -243,6 +252,41 @@ class CommandParser:
          CommandType.LIST_RUNNING_APPS, None),
         (r"what\s+(?:apps?|applications?)\s+(?:are|is)\s+(?:running|open)", 
          CommandType.LIST_RUNNING_APPS, None),
+        
+        # ============ REMINDERS & ALARMS ============
+        # Set reminder with duration: "remind me in 30 minutes to..."
+        (r"(?:remind\s+me|set\s+(?:a\s+)?reminder)\s+(?:in\s+)?(.+)", 
+         CommandType.SET_REMINDER, "reminder_text"),
+        
+        # Set alarm: "set alarm for 7am", "alarm at 7:30"
+        (r"(?:set\s+(?:an?\s+)?alarm|alarm)\s+(?:for\s+|at\s+)?(.+)", 
+         CommandType.SET_ALARM, "alarm_text"),
+        (r"wake\s+(?:me\s+)?(?:up\s+)?(?:at\s+)?(.+)", 
+         CommandType.SET_ALARM, "alarm_text"),
+        
+        # Set timer: "set timer for 10 minutes", "timer 5 minutes"
+        (r"(?:set\s+(?:a\s+)?timer|timer)\s+(?:for\s+)?(.+)", 
+         CommandType.SET_TIMER, "timer_text"),
+        (r"(?:start\s+)?countdown\s+(?:for\s+)?(.+)", 
+         CommandType.SET_TIMER, "timer_text"),
+        
+        # List reminders
+        (r"(?:what|show|list|display)\s+(?:are\s+)?(?:my\s+)?(?:all\s+)?reminders?", 
+         CommandType.LIST_REMINDERS, None),
+        (r"(?:what|show|list)\s+(?:are\s+)?(?:my\s+)?(?:all\s+)?(?:alarms?|timers?)", 
+         CommandType.LIST_REMINDERS, None),
+        (r"(?:do\s+i\s+have\s+)?(?:any\s+)?reminders?", 
+         CommandType.LIST_REMINDERS, None),
+        
+        # Delete reminders
+        (r"(?:delete|remove|cancel|clear)\s+(?:all\s+)?(?:my\s+)?reminders?", 
+         CommandType.DELETE_ALL_REMINDERS, None),
+        (r"(?:delete|remove|cancel)\s+(?:reminder|alarm|timer)\s+(.+)", 
+         CommandType.DELETE_REMINDER, "reminder_id"),
+        
+        # Snooze
+        (r"snooze(?:\s+(?:for\s+)?(\d+)\s*(?:min(?:ute)?s?)?)?", 
+         CommandType.SNOOZE, "snooze_minutes"),
         
         # ============ GREETINGS ============
         (r"^(?:hi|hello|hey|good\s+(?:morning|afternoon|evening))(?:\s+ares)?$", 
@@ -616,6 +660,33 @@ class CommandExecutor:
                 return True, "Could not get running apps."
         
         # ===========================================
+        # REMINDER COMMANDS
+        # ===========================================
+        
+        elif ct == CommandType.SET_REMINDER:
+            return self._handle_set_reminder(params.get("reminder_text", ""), cmd.original_text)
+        
+        elif ct == CommandType.SET_ALARM:
+            return self._handle_set_alarm(params.get("alarm_text", ""), cmd.original_text)
+        
+        elif ct == CommandType.SET_TIMER:
+            return self._handle_set_timer(params.get("timer_text", ""), cmd.original_text)
+        
+        elif ct == CommandType.LIST_REMINDERS:
+            return self._handle_list_reminders()
+        
+        elif ct == CommandType.DELETE_REMINDER:
+            reminder_id = params.get("reminder_id", "")
+            return self._handle_delete_reminder(reminder_id)
+        
+        elif ct == CommandType.DELETE_ALL_REMINDERS:
+            return self._handle_delete_all_reminders()
+        
+        elif ct == CommandType.SNOOZE:
+            minutes = params.get("snooze_minutes", "5")
+            return self._handle_snooze(minutes)
+        
+        # ===========================================
         # CONVERSATIONAL
         # ===========================================
         
@@ -645,6 +716,198 @@ class CommandExecutor:
         
         return False, "Command not implemented yet."
     
+    # ===========================================
+    # REMINDER HANDLERS
+    # ===========================================
+    
+    def _handle_set_reminder(self, text: str, original: str) -> Tuple[bool, str]:
+        """Handle setting a reminder."""
+        try:
+            from automation.reminders import get_reminder_manager, TimeParser
+            manager = get_reminder_manager()
+            
+            # Extract message first
+            message = TimeParser.extract_message(original)
+            
+            # Try to parse duration (in X minutes/hours)
+            duration = TimeParser.parse_relative(text)
+            if duration:
+                hours = duration.get("hours", 0)
+                minutes = duration.get("minutes", 0)
+                seconds = duration.get("seconds", 0)
+                
+                if hours > 0 or minutes > 0 or seconds > 0:
+                    reminder = manager.add_relative(
+                        message,
+                        hours=hours,
+                        minutes=minutes,
+                        seconds=seconds
+                    )
+                    time_str = reminder.time_until()
+                    return True, f"📝 Reminder set: '{message}' in {time_str}."
+            
+            # Try to parse absolute time (at X:XX)
+            time_info = TimeParser.parse_absolute(text)
+            if time_info:
+                reminder = manager.add_at_time(
+                    message,
+                    hour=time_info["hour"],
+                    minute=time_info["minute"]
+                )
+                time_str = reminder.trigger_time.strftime("%I:%M %p")
+                date_str = "today" if reminder.trigger_time.date() == __import__('datetime').datetime.now().date() else "tomorrow"
+                return True, f"📝 Reminder: '{message}' at {time_str} {date_str}."
+            
+            return False, "I couldn't understand the time. Try: 'remind me in 30 minutes to take a break' or 'remind me at 5pm to call mom'"
+            
+        except Exception as e:
+            return False, f"Could not set reminder: {e}"
+    
+    def _handle_set_alarm(self, text: str, original: str) -> Tuple[bool, str]:
+        """Handle setting an alarm."""
+        try:
+            from automation.reminders import get_reminder_manager, TimeParser
+            manager = get_reminder_manager()
+            
+            time_info = TimeParser.parse_absolute(text)
+            if time_info:
+                recurring = 'daily' in text.lower() or 'every' in text.lower()
+                alarm = manager.set_alarm(
+                    hour=time_info["hour"],
+                    minute=time_info["minute"],
+                    recurring=recurring
+                )
+                
+                time_str = alarm.trigger_time.strftime("%I:%M %p")
+                rec_str = " (daily)" if recurring else ""
+                return True, f"⏰ Alarm set for {time_str}{rec_str}!"
+            
+            return False, "I couldn't understand the time. Try: 'set alarm for 7am' or 'alarm at 14:30'"
+            
+        except Exception as e:
+            return False, f"Could not set alarm: {e}"
+    
+    def _handle_set_timer(self, text: str, original: str) -> Tuple[bool, str]:
+        """Handle setting a timer."""
+        try:
+            from automation.reminders import get_reminder_manager, TimeParser
+            manager = get_reminder_manager()
+            
+            duration = TimeParser.parse_relative(text)
+            if duration:
+                hours = duration.get("hours", 0)
+                minutes = duration.get("minutes", 0)
+                seconds = duration.get("seconds", 0)
+                
+                total_minutes = hours * 60 + minutes
+                
+                if total_minutes > 0 or seconds > 0:
+                    timer = manager.set_timer(total_minutes, seconds)
+                    time_str = timer.time_until()
+                    return True, f"⏱️ Timer set for {time_str}!"
+            
+            return False, "I couldn't understand the duration. Try: 'set timer for 10 minutes' or 'timer 30 seconds'"
+            
+        except Exception as e:
+            return False, f"Could not set timer: {e}"
+    
+    def _handle_list_reminders(self) -> Tuple[bool, str]:
+        """Handle listing reminders."""
+        try:
+            from automation.reminders import get_reminder_manager
+            manager = get_reminder_manager()
+            return True, manager.format_list()
+        except Exception as e:
+            return False, f"Could not list reminders: {e}"
+    
+    def _handle_delete_reminder(self, reminder_id: str) -> Tuple[bool, str]:
+        """Handle deleting a specific reminder."""
+        try:
+            from automation.reminders import get_reminder_manager
+            manager = get_reminder_manager()
+            
+            # Try to delete by index if it's a number
+            try:
+                index = int(reminder_id.strip())
+                if manager.delete_by_index(index):
+                    return True, f"🗑️ Deleted reminder {index}."
+                return False, f"Reminder {index} not found."
+            except ValueError:
+                pass
+            
+            # Try to delete by ID
+            if manager.delete(reminder_id.strip()):
+                return True, f"🗑️ Reminder deleted."
+            return False, f"Could not find reminder: {reminder_id}"
+            
+        except Exception as e:
+            return False, f"Could not delete reminder: {e}"
+    
+    def _handle_delete_all_reminders(self) -> Tuple[bool, str]:
+        """Handle deleting all reminders."""
+        try:
+            from automation.reminders import get_reminder_manager
+            manager = get_reminder_manager()
+            
+            count = manager.clear_all()
+            
+            if count > 0:
+                return True, f"🗑️ Deleted {count} reminder(s)."
+            else:
+                return True, "No reminders to delete."
+            
+        except Exception as e:
+            return False, f"Could not delete reminders: {e}"
+    
+    def _handle_snooze(self, minutes_str: str) -> Tuple[bool, str]:
+        """Handle snoozing a reminder."""
+        try:
+            from automation.reminders import get_reminder_manager
+            manager = get_reminder_manager()
+            
+            minutes = 5  # Default
+            if minutes_str:
+                try:
+                    minutes = int(minutes_str)
+                except:
+                    pass
+            
+            # Get recently triggered reminders
+            triggered = manager.get_triggered()
+            
+            if triggered:
+                reminder = triggered[-1]
+                if manager.snooze(reminder.id, minutes):
+                    return True, f"😴 Snoozed for {minutes} minutes."
+            
+            return False, "No recent reminder to snooze."
+            
+        except Exception as e:
+            return False, f"Could not snooze: {e}"
+    
+    def _extract_reminder_message(self, text: str) -> str:
+        """Extract the reminder message from text."""
+        import re
+        
+        # Remove common patterns
+        patterns = [
+            r'remind\s+me\s+',
+            r'set\s+(?:a\s+)?reminder\s+',
+            r'in\s+\d+\s*(?:hour|hr|h|minute|min|m|second|sec|s)s?\s*',
+            r'at\s+\d{1,2}(?::\d{2})?\s*(?:am|pm)?\s*',
+            r'to\s+',
+            r'that\s+',
+            r'tomorrow\s*',
+        ]
+        
+        result = text.lower()
+        for pattern in patterns:
+            result = re.sub(pattern, '', result, flags=re.IGNORECASE)
+        
+        result = result.strip(' .,')
+        
+        return result if result else "Reminder"
+    
     def _get_help_message(self) -> str:
         """Get help message with available commands."""
         return """Here's what I can do:
@@ -660,6 +923,13 @@ class CommandExecutor:
 ⌨️ TYPE: "Type hello world"
 🔒 SYSTEM: "Lock computer"
 ⏰ INFO: "What time is it?", "Battery status"
+
+⏰ REMINDERS:
+• "Remind me in 30 minutes to take a break"
+• "Set alarm for 7am"
+• "Set timer for 10 minutes"
+• "Show my reminders"
+• "Delete all reminders"
 
 Just speak naturally!"""
 
