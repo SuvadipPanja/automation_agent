@@ -1,180 +1,410 @@
-#!/usr/bin/env python3
 """
 =====================================================
-ARES - AUTONOMOUS RUNTIME AI AGENT
+ARES - Main Web Entry Point
 =====================================================
-MAIN ENTRY POINT - Run this file to start ARES!
+
+SINGLE ENTRY POINT FOR PRODUCTION
 
 Usage:
     python main_web.py
 
-Then open: http://127.0.0.1:5000
+This script:
+1. Sets up project paths
+2. Initializes ARES Manager (orchestrates all services)
+3. Starts Flask web server
+4. Handles graceful shutdown
 
-All features are integrated:
-✅ Web UI (JARVIS-style modern interface)
-✅ Voice Recognition (Whisper)
-✅ AI Brain (Intelligent conversation)
-✅ Desktop Automation (PyAutoGUI)
-✅ Task Management (30+ predefined tasks)
-✅ Smart Scheduling (Daily, weekly, interval)
-✅ Reminder System (Alarms, timers, notifications)
-✅ Text-to-Speech (pyttsx3)
+Everything runs in the backend via the manager.
+Frontend only sends commands via API endpoints.
 
-Features:
-- Production-ready Flask backend
-- Real-time voice processing
-- Automated task execution
-- Background scheduling
-- Persistent storage
-- Error recovery
-- Component health monitoring
-
-Author: ARES AI Assistant
+Author: ARES Development
 For: Suvadip Panja
 =====================================================
 """
 
-import sys
 import os
+import sys
+import logging
 from pathlib import Path
+from typing import Optional
 
 # ===================================================
-# PATH CONFIGURATION
+# PROJECT STRUCTURE SETUP
 # ===================================================
 
-# Get project root directory
+# Get project root
 PROJECT_ROOT = Path(__file__).resolve().parent
+print(f"\n📁 Project Root: {PROJECT_ROOT}")
+print(f"🐍 Python Version: {sys.version.split()[0]}")
+
+# Add to Python path
 sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(PROJECT_ROOT / "web"))
+sys.path.insert(0, str(PROJECT_ROOT / "automation"))
+sys.path.insert(0, str(PROJECT_ROOT / "ai"))
 
+# Verify critical directories exist
+required_dirs = [
+    PROJECT_ROOT / "web",
+    PROJECT_ROOT / "web" / "templates",
+    PROJECT_ROOT / "web" / "static",
+]
+
+print("\n📂 Checking directory structure...")
+for dir_path in required_dirs:
+    if dir_path.exists():
+        print(f"  ✅ {dir_path.name}")
+    else:
+        print(f"  ⚠️  {dir_path.name} - Not found")
+
+# ===================================================
+# ARES MANAGER INITIALIZATION
+# ===================================================
+
+print("\n🚀 Initializing ARES Manager...")
 print("=" * 70)
-print("  🚀 ARES - Autonomous Runtime AI Agent")
-print("=" * 70)
-print(f"  Project Root: {PROJECT_ROOT}")
-print(f"  Python Version: {sys.version.split()[0]}")
-print()
 
+from ares_manager import initialize_ares, get_manager
 
-# ===================================================
-# COMPONENT INITIALIZATION (Pre-Flask)
-# ===================================================
-
-print("  Initializing components...")
-print()
-
-# AI Brain
 try:
-    from ai.brain import AIBrain
-    brain = AIBrain()
-    print("  ✅ AI Brain loaded successfully")
+    # Initialize all backend services
+    ares = initialize_ares()
+    print("✅ ARES Manager initialized successfully")
 except Exception as e:
-    print(f"  ⚠️  AI Brain failed: {e}")
-
-# Desktop Automation
-try:
-    from desktop import handle_command, desktop
-    print("  ✅ Desktop Automation initialized")
-except Exception as e:
-    print(f"  ⚠️  Desktop Automation failed: {e}")
-
-# Voice Recognition
-try:
-    from faster_whisper import WhisperModel
-    print("  ✅ Whisper voice recognition ready")
-except Exception as e:
-    print(f"  ⚠️  Voice Recognition failed: {e}")
-
-# Reminder System
-try:
-    from automation.reminders import get_reminder_manager
-    reminder_manager = get_reminder_manager()
-    print("  ✅ Reminder system initialized")
-except Exception as e:
-    print(f"  ⚠️  Reminder system failed: {e}")
-
-# Task System
-try:
-    from automation.tasks import get_task_manager
-    task_manager = get_task_manager()
-    print("  ✅ Task system initialized")
-except Exception as e:
-    print(f"  ⚠️  Task system failed: {e}")
-
-# Scheduler System
-try:
-    from automation.scheduler import get_scheduler
-    scheduler = get_scheduler()
-    print("  ✅ Scheduler system initialized")
-except Exception as e:
-    print(f"  ⚠️  Scheduler failed: {e}")
-
-print()
-
-
-# ===================================================
-# FLASK APP IMPORT
-# ===================================================
-
-try:
-    from web.app import app, print_startup
-    print("  ✅ Flask app imported successfully")
-except ImportError as e:
-    print(f"  ❌ CRITICAL: Failed to import Flask app")
-    print(f"     Error: {e}")
-    print()
-    print("     Make sure:")
-    print("     1. web/app.py exists in project root")
-    print("     2. Flask is installed: pip install flask")
-    print("     3. All dependencies are available")
+    print(f"❌ ARES Manager initialization failed: {e}")
     sys.exit(1)
 
-print()
+# ===================================================
+# FLASK APP SETUP
+# ===================================================
+
+print("\n" + "=" * 70)
+print("🌐 Initializing Flask Web Server...")
+print("=" * 70)
+
+from flask import Flask, render_template, request, jsonify
+
+# Create Flask app
+app = Flask(
+    __name__,
+    template_folder=str(PROJECT_ROOT / "web" / "templates"),
+    static_folder=str(PROJECT_ROOT / "web" / "static")
+)
+
+app.config['JSON_SORT_KEYS'] = False
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max upload
+
+print("✅ Flask app created")
 
 
 # ===================================================
-# APPLICATION STARTUP
+# API ROUTES - UNIFIED COMMAND INTERFACE
 # ===================================================
+
+@app.route("/")
+def index():
+    """Serve modern ARES UI."""
+    return render_template("index_modern.html")
+
+
+@app.route("/classic")
+def index_classic():
+    """Serve classic ARES UI."""
+    return render_template("index.html")
+
+
+@app.route("/health", methods=["GET"])
+def health_check():
+    """System health check."""
+    manager = get_manager()
+    status = manager.get_all_status()
+    available_services = sum(1 for s in status.values() if s["available"])
+    total_services = len(status)
+    
+    return jsonify({
+        "status": "ONLINE",
+        "agent": "ARES",
+        "services_available": available_services,
+        "services_total": total_services,
+        "details": status
+    })
+
+
+@app.route("/status", methods=["GET"])
+def status():
+    """Get current system status."""
+    manager = get_manager()
+    status_info = manager.get_all_status()
+    
+    return jsonify({
+        "online": True,
+        "mode": "production",
+        "user": "Suvadip Panja",
+        "components": status_info,
+        "all_ready": all(s["available"] for s in status_info.values())
+    })
+
+
+# ===================================================
+# COMMAND EXECUTION - ALL COMMANDS ROUTE HERE
+# ===================================================
+
+@app.route("/command", methods=["POST"])
+def execute_command_endpoint():
+    """
+    Universal command endpoint.
+    
+    All commands (voice, text, buttons) route here.
+    Manager handles intelligent routing to appropriate service.
+    
+    Request: {"command": "user input"}
+    Response: Command execution result
+    """
+    try:
+        data = request.get_json(silent=True)
+        if not data or "command" not in data:
+            return jsonify({"error": "No command provided"}), 400
+        
+        command = data["command"].strip()
+        if not command:
+            return jsonify({"error": "Empty command"}), 400
+        
+        # Execute via manager
+        manager = get_manager()
+        result = manager.execute_command(command)
+        
+        return jsonify(result.to_dict())
+    
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "action": "error"
+        }), 500
+
+
+# ===================================================
+# LEGACY ENDPOINTS (For compatibility)
+# ===================================================
+
+@app.route("/ai-command", methods=["POST"])
+def ai_command_legacy():
+    """Legacy AI command endpoint - routes to new command endpoint."""
+    return execute_command_endpoint()
+
+
+@app.route("/direct-action", methods=["POST"])
+def direct_action_legacy():
+    """Legacy direct action endpoint - routes to new command endpoint."""
+    return execute_command_endpoint()
+
+
+# ===================================================
+# SERVICE SPECIFIC ENDPOINTS
+# ===================================================
+
+@app.route("/tasks", methods=["GET"])
+def get_tasks():
+    """Get all tasks from task service."""
+    manager = get_manager()
+    tasks_service = manager.services.get("tasks")
+    
+    if not tasks_service or not tasks_service.initialized:
+        return jsonify({"error": "Task system not available", "tasks": []}), 503
+    
+    tasks = tasks_service.get_all_tasks()
+    return jsonify({
+        "tasks": tasks,
+        "count": len(tasks),
+        "success": True
+    })
+
+
+@app.route("/schedules", methods=["GET"])
+def get_schedules():
+    """Get all schedules from scheduler service."""
+    manager = get_manager()
+    scheduler_service = manager.services.get("scheduler")
+    
+    if not scheduler_service or not scheduler_service.initialized:
+        return jsonify({"error": "Scheduler not available", "schedules": []}), 503
+    
+    schedules = scheduler_service.get_all_schedules()
+    return jsonify({
+        "schedules": schedules,
+        "count": len(schedules),
+        "success": True
+    })
+
+
+@app.route("/reminders", methods=["GET"])
+def get_reminders():
+    """Get all reminders from reminder service."""
+    manager = get_manager()
+    reminder_service = manager.services.get("reminders")
+    
+    if not reminder_service or not reminder_service.initialized:
+        return jsonify({"error": "Reminder system not available", "reminders": []}), 503
+    
+    reminders = reminder_service.get_all_reminders()
+    return jsonify({
+        "reminders": reminders,
+        "count": len(reminders),
+        "success": True
+    })
+
+
+# ===================================================
+# VOICE TRANSCRIPTION ENDPOINT
+# ===================================================
+
+@app.route("/voice/transcribe", methods=["POST"])
+def voice_transcribe():
+    """Transcribe audio using voice service."""
+    manager = get_manager()
+    voice_service = manager.services.get("voice")
+    
+    if not voice_service or not voice_service.initialized:
+        return jsonify({"error": "Voice service not available"}), 503
+    
+    try:
+        import tempfile
+        import base64
+        
+        # Get audio data
+        if request.files and 'audio' in request.files:
+            audio_file = request.files['audio']
+            temp_path = tempfile.mktemp(suffix=".wav")
+            audio_file.save(temp_path)
+        elif request.is_json:
+            data = request.get_json()
+            if 'audio_base64' in data:
+                audio_bytes = base64.b64decode(data['audio_base64'])
+                temp_path = tempfile.mktemp(suffix=".wav")
+                with open(temp_path, 'wb') as f:
+                    f.write(audio_bytes)
+            else:
+                return jsonify({"error": "No audio data"}), 400
+        else:
+            return jsonify({"error": "No audio data"}), 400
+        
+        # Transcribe
+        success, text = voice_service.transcribe(temp_path)
+        
+        if success:
+            # Clean up temp file
+            import os
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+            
+            return jsonify({
+                "success": True,
+                "text": text,
+                "language": "en"
+            })
+        else:
+            return jsonify({"error": text}), 400
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ===================================================
+# ERROR HANDLERS
+# ===================================================
+
+@app.errorhandler(404)
+def not_found(error):
+    """Handle 404 errors."""
+    return jsonify({
+        "error": "Endpoint not found",
+        "status": 404
+    }), 404
+
+
+@app.errorhandler(500)
+def server_error(error):
+    """Handle 500 errors."""
+    return jsonify({
+        "error": "Internal server error",
+        "status": 500
+    }), 500
+
+
+# ===================================================
+# STATIC FILES
+# ===================================================
+
+@app.route("/static/<path:filename>")
+def serve_static(filename):
+    """Serve static files."""
+    from flask import send_from_directory
+    return send_from_directory(app.static_folder, filename)
+
+
+# ===================================================
+# STARTUP AND SHUTDOWN
+# ===================================================
+
+def print_startup_info():
+    """Print startup information."""
+    import datetime
+    
+    manager = get_manager()
+    
+    print("\n" + "=" * 70)
+    print("  ✅ ARES - FULLY INITIALIZED & ONLINE")
+    print("=" * 70)
+    print()
+    print("  🌐 Web Interface:")
+    print("     Modern UI: http://127.0.0.1:5000/")
+    print("     Classic UI: http://127.0.0.1:5000/classic")
+    print()
+    print("  📊 API Endpoints:")
+    print("     /command (POST)          - Execute any command")
+    print("     /status (GET)            - System status")
+    print("     /health (GET)            - Health check")
+    print("     /tasks (GET)             - List all tasks")
+    print("     /schedules (GET)         - List all schedules")
+    print("     /reminders (GET)         - List all reminders")
+    print("     /voice/transcribe (POST) - Voice transcription")
+    print()
+    print("  🔧 Server Configuration:")
+    print(f"     Host: 127.0.0.1")
+    print(f"     Port: 5000")
+    print(f"     Debug: True")
+    print(f"     Time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print()
+    print("  📝 Usage:")
+    print("     1. Open: http://127.0.0.1:5000/")
+    print("     2. Click buttons or speak commands")
+    print("     3. All requests route through /command endpoint")
+    print("     4. Manager intelligently routes to appropriate service")
+    print()
+    print("=" * 70)
+    print("  Press CTRL+C to stop server")
+    print("=" * 70 + "\n")
+
 
 if __name__ == "__main__":
-    print("=" * 70)
-    
-    # Call the startup banner from app.py
-    print_startup()
-    
-    print("=" * 70)
-    print("  Server Configuration:")
-    print("    Host: 127.0.0.1")
-    print("    Port: 5000")
-    print("    Debug: True")
-    print("    Reloader: Enabled")
-    print()
-    print("  Starting Flask development server...")
-    print("=" * 70)
-    print()
-    
-    # Start Flask app
     try:
+        print_startup_info()
+        
+        # Start Flask development server
         app.run(
             host="127.0.0.1",
             port=5000,
             debug=True,
-            use_reloader=True,
-            threaded=True
+            use_reloader=False  # Disable reloader to avoid double initialization
         )
     
     except KeyboardInterrupt:
-        print()
-        print("=" * 70)
-        print("  👋 ARES shutting down...")
-        print("  Goodbye, Suvadip! See you next time.")
-        print("=" * 70)
-        print()
+        print("\n\n⏹️  Shutting down ARES...")
+        manager = get_manager()
+        manager.shutdown()
+        print("✅ ARES shutdown complete")
         sys.exit(0)
     
     except Exception as e:
-        print()
-        print("=" * 70)
-        print(f"  ❌ ERROR: {e}")
-        print("=" * 70)
-        import traceback
-        traceback.print_exc()
+        print(f"\n❌ Error: {e}")
         sys.exit(1)
