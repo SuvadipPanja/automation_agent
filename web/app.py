@@ -1,22 +1,4 @@
-"""
-=====================================================
-ARES WEB APPLICATION - INTEGRATED
-=====================================================
-Main Flask application for ARES.
 
-Features:
-✅ Web UI (JARVIS-style interface)
-✅ AI Brain (Ollama/Llama3)
-✅ Desktop Automation
-✅ Whisper Voice Recognition
-✅ Text-to-Speech (via browser)
-
-All accessible from ONE entry point: main_web.py
-
-Author: ARES AI Assistant
-For: Shobutik Panja
-=====================================================
-"""
 
 from flask import Flask, render_template, request, jsonify, send_from_directory
 from pathlib import Path
@@ -678,3 +660,10 @@ def print_startup():
     print(f"Task System: Loaded")
     print(f"Scheduler: Active")
     print("=" * 50)    
+=======
+def print_startup():
+    import datetime
+    timestamp = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
+    print(f'Current Date and Time (UTC - YYYY-MM-DD HH:MM:SS formatted): {timestamp}')
+    print(f'Current User\u0027s Login: SuvadipPanja')
+>>>>>>> c749ba94bac36c78c10fa4a0d1aff267503f19ff
