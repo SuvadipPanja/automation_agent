@@ -1,26 +1,18 @@
 """
 =====================================================
 ARES - Autonomous Runtime AI Assistant
-MODERN ENTERPRISE ARCHITECTURE
+FIXED VERSION WITH PROPER LOGGING
 =====================================================
 
 Architecture Pattern:
   Service-Oriented Architecture (SOA) with Dependency Injection
   
-  main_web.py (Entry Point)
-        ↓
-  ARESManager (Orchestrator)
-        ↓
-  ┌─────────┬─────────┬─────────┬─────────┬──────────┐
-  ↓         ↓         ↓         ↓         ↓          ↓
- AIService DesktopService TaskService SchedulerService ReminderService VoiceService
-  
-Each service:
-- Initializes independently
-- Handles its own errors
-- Provides clean API
-- Logs operations
-- Works seamlessly together
+Features:
+  ✅ Professional logging to files
+  ✅ Daily rotation (automatic)
+  ✅ 50MB size rotation (automatic)
+  ✅ Service-oriented architecture
+  ✅ Enterprise error handling
 
 Author: ARES Development
 For: Suvadip Panja
@@ -30,7 +22,6 @@ For: Suvadip Panja
 import os
 import sys
 import json
-import logging
 import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple
@@ -43,37 +34,20 @@ from enum import Enum
 PROJECT_ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-# ===================================================
-# LOGGING CONFIGURATION
-# ===================================================
-
-class LogLevel(Enum):
-    """Logging levels."""
-    DEBUG = logging.DEBUG
-    INFO = logging.INFO
-    WARNING = logging.WARNING
-    ERROR = logging.ERROR
-    CRITICAL = logging.CRITICAL
-
-def setup_logger(name: str, level: LogLevel = LogLevel.INFO) -> logging.Logger:
-    """Setup logger with consistent format."""
-    logger = logging.getLogger(name)
-    logger.setLevel(level.value)
-    
-    # Only add handlers if not already present
-    if not logger.handlers:
-        handler = logging.StreamHandler()
-        formatter = logging.Formatter(
-            '[%(asctime)s] %(name)s - %(levelname)s - %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S'
-        )
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-    
-    return logger
-
-# Global logger
-logger = setup_logger("ARES", LogLevel.INFO)
+# Import logging configuration
+try:
+    from logger_config import get_logger, get_main_logger, initialize_logging
+    logger = get_main_logger()
+    initialize_logging()
+except ImportError as e:
+    # Fallback if logger_config not available
+    import logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='[%(asctime)s] %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    logger = logging.getLogger("ARES")
 
 
 # ===================================================
@@ -137,7 +111,7 @@ class BaseService:
     def __init__(self, name: str):
         """Initialize service."""
         self.name = name
-        self.logger = setup_logger(f"ARES.{name}")
+        self.logger = get_logger(f"ARES.{name}")
         self.initialized = False
         self.error = None
     
@@ -209,6 +183,7 @@ class AIBrainService(BaseService):
     def converse(self, text: str) -> Tuple[bool, Optional[str]]:
         """Have conversation with AI brain."""
         if not self.initialized or not self.brain:
+            self.logger.warning("AI Brain not available for conversation")
             return False, "AI Brain not available"
         
         try:
@@ -539,7 +514,9 @@ class ARESManager:
     
     def __init__(self):
         """Initialize ARES Manager."""
-        self.logger = setup_logger("ARES.Manager")
+        self.logger = get_logger("ARES.Manager")
+        
+        # Log startup banner
         self.logger.info("=" * 70)
         self.logger.info("  🚀 ARES - Autonomous Runtime AI Assistant")
         self.logger.info("  Modern Enterprise Architecture")
@@ -568,29 +545,51 @@ class ARESManager:
             self.status[service_key] = service.get_status()
             
             if success:
-                self.logger.info(f"    ✅ {service.name} ................. Initialized")
+                status_msg = f"    ✅ {service.name} ................. Initialized"
+                print(status_msg)
+                self.logger.info(status_msg)
             else:
-                self.logger.warning(f"    ⚠️  {service.name} ................. Failed (optional)")
+                status_msg = f"    ⚠️  {service.name} ................. Failed (optional)"
+                print(status_msg)
+                self.logger.warning(status_msg)
                 all_success = False
         
-        self.logger.info()
+        print()
         return all_success
     
     def print_status(self) -> None:
         """Print system status."""
+        print("\n  System Status:")
         self.logger.info("\n  System Status:")
-        self.logger.info(f"    Status: ONLINE")
-        self.logger.info(f"    Mode: Production")
-        self.logger.info(f"    User: Suvadip Panja")
-        self.logger.info(f"    Time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         
+        status_msg = "    Status: ONLINE"
+        print(status_msg)
+        self.logger.info(status_msg)
+        
+        status_msg = "    Mode: Production"
+        print(status_msg)
+        self.logger.info(status_msg)
+        
+        status_msg = "    User: Suvadip Panja"
+        print(status_msg)
+        self.logger.info(status_msg)
+        
+        current_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        status_msg = f"    Time: {current_time}"
+        print(status_msg)
+        self.logger.info(status_msg)
+        
+        print("\n  Component Status:")
         self.logger.info("\n  Component Status:")
+        
         for service_key, service in self.services.items():
             status = self.status.get(service_key)
             symbol = "✅" if status.available else "❌"
-            self.logger.info(f"    {symbol} {status.name} ............ {status.available}")
+            status_msg = f"    {symbol} {status.name} ............ {status.available}"
+            print(status_msg)
+            self.logger.info(status_msg)
         
-        self.logger.info()
+        print()
     
     def get_all_status(self) -> Dict[str, Any]:
         """Get all service statuses."""
@@ -605,6 +604,7 @@ class ARESManager:
         Routes to appropriate service.
         """
         cmd_lower = command.lower().strip()
+        self.logger.info(f"Executing command: {command}")
         
         # ===============================================
         # PRIORITY 1: Desktop Automation (Fast)
@@ -771,3 +771,11 @@ if __name__ == "__main__":
     print("=" * 70)
     print("✅ ARES Manager Ready!")
     print("=" * 70)
+    
+    # Show logs location
+    from logger_config import LOGS_DIR
+    print(f"\n📂 Logs saved to: {LOGS_DIR}")
+    print("   Files created:")
+    print("   - ares_main.log")
+    print("   - ares_errors.log")
+    print("   - ares_debug.log")
