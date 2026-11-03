@@ -9,6 +9,8 @@
 ![Whisper](https://img.shields.io/badge/Speech-faster--whisper-111827?style=flat-square)
 ![Windows](https://img.shields.io/badge/Windows-0078D6?style=flat-square&logo=windows&logoColor=white)
 
+![License: MIT](https://img.shields.io/badge/License-MIT-22c55e?style=flat-square)
+
 </div>
 
 ---
@@ -49,6 +51,10 @@ python main_web.py          # web dashboard
 ```
 
 On Windows you can also use `START_ARES_VOICE.bat`. Run `setup_whisper.bat` once to download the speech model.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
 
 ---
 
